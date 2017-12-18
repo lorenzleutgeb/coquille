@@ -153,12 +153,21 @@ class API:
 
     def parse_response(self, xml):
         messageNodes = []
-        valueNode = None
+        valueNodes = []
         for c in xml.getchildren():
             if c.tag == 'value':
-                valueNode = c
+                valueNodes.append(c)
             if c.tag == 'message':
                 messageNodes.append(c)
+        if len(valueNodes) > 1:
+            for c in valueNodes:
+                for d in list(parse_value(c[0])):
+                    if isinstance(d, StateId):
+                        valueNode = c
+        elif len(valueNodes) == 1:
+            valueNode = valueNodes[0]
+        else:
+            valueNode = None
         if valueNode.get('val') == 'good':
             return Ok(parse_value(valueNode[0]), messageNodes)
         if valueNode.get('val') == 'fail':

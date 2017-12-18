@@ -39,10 +39,12 @@ class Messenger(Thread):
                 sleep = self.messages == []
                 if not sleep:
                     message = self.messages.pop()
+                    self.coqtop.send_cmd(message.get_string())
+
             if sleep:
                 time.sleep(0.2)
                 continue
-            self.coqtop.send_cmd(message.get_string())
+
             ans = self.coqtop.get_answer()
             self.coqtop.remove_answer(ans, message.type)
         with self.lock:
@@ -216,18 +218,14 @@ class CoqTop:
         return a.parse_response(elt)
 
     def remove_answer(self, r, msgtype):
-        self.printer.debug("removing... ")
         self.printer.parseMessage(r, msgtype)
         if isinstance(r, Err) and msgtype == 'addgoal':
             self.rewind(1)
             return
-        self.printer.debug("not an addgoal error... ")
         if not hasattr(r, 'val'):
             return
-        self.printer.debug("contains val... ")
         for c in list(r.val):
             if isinstance(c, StateId):
-                self.printer.debug("val is " + str(c) + "   ")
                 self.states.append(self.state_id)
                 self.state_id = c
                 break
