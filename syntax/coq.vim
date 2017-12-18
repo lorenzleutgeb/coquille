@@ -47,9 +47,8 @@ syn keyword coqTopLevel          Declare Type Canonical Structure Cd Coercion De
 syn keyword coqVernacCmd         Functional Scheme Back Combined
 syn keyword coqFeedback          Show About Print
 
-" Modules
-syn region coqModule contains=coqIdent matchgroup=coqTopLevel start="Module" end="\.\_s" end=":="me=e-2 nextgroup=coqModVal
-syn region coqModVal contains=coqIdent start=":=" end="\.\_s"
+" Non proofs
+syn region coqCompute contains=coqIdent matchgroup=coqTopLevel start="Check|Compute|Search|SearchAbout" end="\.\_s"
 
 " Terms
 syn cluster coqTerm            contains=coqKwd,coqTermPunctuation,coqKwdMatch,coqKwdLet,coqKwdParen
@@ -72,6 +71,10 @@ syn region coqShow       matchgroup=coqVernacCmd start="\<Show\_s\+\%(\%(Implici
 
 " Sections
 syn region coqSection contains=coqSection,@coqVernac matchgroup=coqVernacCmd start="\<Section\_s*\z(\S\+\)\_s*\.\_s" end="\<End\_s\+\z1\_s*\.\_s"
+syn region coqModule contains=@coqVernac matchgroup=coqVernacPunctuation start="\<Module\_s*\(Type\_s*\)\?\z(\S\+\)\_s*\((\_s*\S*\_s*:\_s*\S*\(\_s+\S*\)*\_s*)\_s*\)*\_s*\(<:\_s*\S*\)\?\.\_s" end="\<End\_s\+\z1\_s*\.\_s"
+syn region coqModule           contains=coqModuleBody start="Module.*:=" matchgroup=coqVernacPunctuation end="\.\_s" keepend
+syn region coqModuleBody       contained contains=coqModuleName matchgroup=coqVernacCmd start="Module" start="\<with\>" matchgroup=NONE end="\.\_s"
+syn region coqModuleName       contained matchgroup=coqIdent start="[_[:alpha:]][_'[:alnum:]]*" matchgroup=NONE end="\.\_s"
 
 " Obligations
 syn region coqObligation contains=coqIdent   matchgroup=coqVernacCmd start="\<\%(\%(\%(Admit\_s\+\)\?Obligations\)\|\%(Obligation\_s\+\d\+\)\|\%(Next\_s\+Obligation\)\|Preterm\)\%(\_s\+of\)\?\>" end="\.\_s"
@@ -191,13 +194,13 @@ syn keyword coqTacNotationKwd contained ident simple_intropattern hyp reference 
 syn match   coqTacNotationKwd contained "at level"
 
 " Declarations 
-syn region coqDecl       contains=coqIdent,coqDeclTerm,coqDeclBinder matchgroup=coqVernacCmd start="\<\%(Axiom\|Conjecture\|Hypothes[ie]s\|Parameters\?\|Variables\?\)\>" matchgroup=coqVernacCmd end="\.\_s" keepend
+syn region coqDecl       contains=coqIdent,coqDeclTerm,coqDeclBinder matchgroup=coqVernacCmd start="\<\%(Axiom\|Conjecture\|Hypothes[ie]s\|Parameters\?\|Variables\?\|Generalizable\ Variables\?\)\>" matchgroup=coqVernacCmd end="\.\_s" keepend
 syn region coqDeclBinder contained contains=coqIdent,coqDeclTerm matchgroup=coqVernacPunctuation start="(" end=")" keepend
 syn region coqDeclTerm   contained contains=@coqTerm matchgroup=coqVernacPunctuation start=":" end=")"
 syn region coqDeclTerm   contained contains=@coqTerm matchgroup=coqVernacPunctuation start=":" end="\.\_s"
 
 " Theorems
-syn region coqThm       contains=coqThmName matchgroup=coqVernacCmd start="\<\%(Program\_s\+\)\?\%(Theorem\|Lemma\|Example\|Corollary\|Remark\)\>" matchgroup=NONE end="\<\%(Qed\|Defined\|Admitted\|Abort\)\.\_s" keepend
+syn region coqThm       contains=coqThmName matchgroup=coqVernacCmd start="\<\%(Program\_s\+\)\?\%(Theorem\|Lemma\|Example\|Corollary\|Remark\|Instance\)\>" matchgroup=NONE end="\<\%(Qed\|Defined\|Admitted\|Abort\)\.\_s" keepend
 syn region coqThmName   contained contains=coqThmTerm,coqThmBinder matchgroup=coqIdent start="[_[:alpha:]][_'[:alnum:]]*" matchgroup=NONE end="\<\%(Qed\|Defined\|Admitted\|Abort\)\.\_s"
 syn region coqThmTerm   contained contains=@coqTerm,coqProofBody matchgroup=coqVernacCmd start=":" matchgroup=NONE end="\<\%(Qed\|Defined\|Admitted\|Abort\)\>"
 syn region coqThmBinder contained matchgroup=coqVernacPunctuation start="(" end=")" keepend
@@ -277,8 +280,8 @@ syn region coqIndNotScope    contained contains=coqIndBody matchgroup=coqVernacP
 syn match  coqConstructor    contained "[_[:alpha:]][_'[:alnum:]]*"
 
 " Records
-syn region coqRec        contains=coqRecProfile start="\<Record\>" matchgroup=coqVernacPunctuation end="\.\_s" keepend
-syn region coqRecProfile contained contains=coqIdent,coqRecTerm,coqRecBinder matchgroup=coqVernacCmd start="Record" matchgroup=NONE end="\.\_s"
+syn region coqRec        contains=coqRecProfile start="\<\%(Record\|Class\)\>" matchgroup=coqVernacPunctuation end="\.\_s" keepend
+syn region coqRecProfile contained contains=coqIdent,coqRecTerm,coqRecBinder matchgroup=coqVernacCmd start="\%(Record\|Class\)" matchgroup=NONE end="\.\_s"
 syn region coqRecBinder  contained contains=@coqTerm matchgroup=coqTermPunctuation start="("  end=")"
 syn region coqRecTerm    contained contains=@coqTerm,coqRecContent matchgroup=coqVernacPunctuation start=":"  end="\.\_s"
 syn region coqRecContent contained contains=coqConstructor,coqRecStart matchgroup=coqVernacPunctuation start=":=" end="\.\_s"

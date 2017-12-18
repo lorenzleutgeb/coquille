@@ -56,12 +56,13 @@ class Main(object):
             self.vim.call('coquille#ShowPanels')
             self.actionner.start()
         else:
+            self.vim.command('echo "Coq could not be launched!"')
             self.running = False
 
     @neovim.function('CoqStop', sync=True)
     def stop(self, args=[]):
         if not self.running:
-            #self.vim.err_write('Coquille is already stopped!')
+            self.vim.err_write('Coquille is already stopped!')
             return
         self.running = False
         self.actionner.stop()
@@ -170,6 +171,16 @@ class CursorRequester(Requester):
     def request(self):
         self.setResult(self.vim.current.window.cursor)
 
+class LineRequester(Requester):
+    def __init__(self, vim, line):
+        Requester.__init__(self)
+        self.vim = vim
+        self.line = line
+
+    def request(self):
+        buff = self.vim.current.buffer
+        self.setResult(buff[self.line])
+
 class Actionner(Thread):
     def __init__(self, main):
         Thread.__init__(self)
@@ -220,9 +231,11 @@ class Actionner(Thread):
         with self.running_lock:
             step = request(self.vim, StepRequester(self))
             if step is None: return
-            (eline, ecol) = step['stop']
-            self.running_dots.insert(0, (eline, ecol + 1))
             message = request(self.vim, BetweenRequester(self, step['start'], step['stop']))
+            (eline, ecol) = step['stop']
+            line = request(self.vim, LineRequester(self.vim, eline))[:ecol]
+            ecol += len(bytes(line, encoding)) - len(line)
+            self.running_dots.insert(0, (eline, ecol + 1))
             self.ct.advance(message, encoding)
             self.ct.goals(True)
         self.ask_redraw()
@@ -255,6 +268,8 @@ class Actionner(Thread):
                     if step is None: break
                     if step['stop'] <= (cline - 1, ccol):
                         (eline, ecol) = step['stop']
+                        line = request(self.vim, LineRequester(self.vim, eline))[:ecol]
+                        ecol += len(bytes(line, encoding)) - len(line)
                         self.running_dots.insert(0, (eline, ecol + 1))
                         message = request(self.vim, BetweenRequester(self, step['start'], step['stop']))
                         self.ct.advance(message, encoding)
@@ -313,7 +328,10 @@ class Actionner(Thread):
                     self.running_dots = []
 
     def showError(self, pos):
-        (line, col) = self.valid_dots[-1]
+        if self.valid_dots == []:
+            (line, col) = (0, 0)
+        else:
+            (line, col) = self.valid_dots[-1]
         start = { 'line': line + 1, 'col': col }
         (line, col) = pos
         stop = { 'line': line + 1, 'col': col }
@@ -340,7 +358,10 @@ class Actionner(Thread):
             return
         if isinstance(info, RichPP):
             info = info.parts
-            info.remove(None)
+            try:
+                info.remove(None)
+            except:
+                pass
             info = ''.join(info)
         #self.vim.command('echo "' + str(info).replace("\"", "\\\"") + '"')
         lst = map(lambda s: s.encode('utf-8'), info.split('\n'))
@@ -473,7 +494,7 @@ class Actionner(Thread):
         end_pos = self._find_next_chunk(line, col)
         return { 'start':after , 'stop':end_pos } if end_pos is not None else None
     
-    def _find_next_chunk(self, line, col):
+    def _find_next_chunk(self, line, col, encoding='utf-8'):
         """
         Returns the position of the next chunk dot after a certain position.
         That can either be a bullet if we are in a proof, or "a string" terminated
@@ -514,9 +535,9 @@ class Actionner(Thread):
     
     
         # If the chunk doesn't start with a bullet, we look for a dot.
-        return self._find_dot_after(line, col)
+        return self._find_dot_after(line, col, encoding)
 
-    def _find_dot_after(self, line, col):
+    def _find_dot_after(self, line, col, encoding='utf-8'):
         """
         Returns the position of the next "valid" dot after a certain position.
         Valid here means: recognized by Coq as terminating an input, so dots in

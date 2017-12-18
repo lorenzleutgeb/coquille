@@ -39,15 +39,12 @@ class Messenger(Thread):
                 sleep = self.messages == []
                 if not sleep:
                     message = self.messages.pop()
-
             if sleep:
                 time.sleep(0.2)
                 continue
-
             self.coqtop.send_cmd(message.get_string())
             ans = self.coqtop.get_answer()
             self.coqtop.remove_answer(ans, message.type)
-
         with self.lock:
             self.messages = []
 
@@ -115,7 +112,7 @@ class CoqTop:
             self.kill()
         self.messenger = Messenger(self)
         options = [ 'coqtop', '-ideslave', '-main-channel', 'stdfds',
-            '-async-proofs', 'on',
+            '-async-proofs', 'on', '-R', '.', '',
             # prevent stupid behavior where "admit"s are added when errors
             # should occur. This "error resilience" non sense make coqc and
             # coqtop act differently, and the user wouldn't expect that.
@@ -179,6 +176,7 @@ class CoqTop:
         a = API()
         message = a.get_call_msg('StopWorker', "0")
         self.send_cmd(message)
+        self.get_answer()
 
     def send_async_cmd(self, msg):
         if self.coqtop is None:
@@ -189,6 +187,7 @@ class CoqTop:
         if self.coqtop is None:
             return
         with self.write_lock:
+            self.printer.debug(">>>" + str(msg))
             self.coqtop.stdin.write(msg)
             self.coqtop.stdin.flush()
 
@@ -217,14 +216,18 @@ class CoqTop:
         return a.parse_response(elt)
 
     def remove_answer(self, r, msgtype):
+        self.printer.debug("removing... ")
         self.printer.parseMessage(r, msgtype)
         if isinstance(r, Err) and msgtype == 'addgoal':
             self.rewind(1)
             return
+        self.printer.debug("not an addgoal error... ")
         if not hasattr(r, 'val'):
             return
+        self.printer.debug("contains val... ")
         for c in list(r.val):
             if isinstance(c, StateId):
+                self.printer.debug("val is " + str(c) + "   ")
                 self.states.append(self.state_id)
                 self.state_id = c
                 break
