@@ -180,6 +180,9 @@ class CoqTop:
         self.send_cmd(message)
         self.get_answer()
 
+    def silent_interupt(self):
+        self.messenger.interupt()
+
     def send_async_cmd(self, msg):
         if self.coqtop is None:
             return
@@ -215,12 +218,15 @@ class CoqTop:
                     continue
             except OSError:
                 return None
+        self.printer.debug("\n<<<" + str(data))
         return a.parse_response(elt)
 
     def remove_answer(self, r, msgtype):
         self.printer.parseMessage(r, msgtype)
         if isinstance(r, Err) and msgtype == 'addgoal':
-            self.rewind(1)
+            idx = len(self.states) - step
+            self.state_id = self.states[idx]
+            self.states = self.states[0:idx]
             return
         if not hasattr(r, 'val'):
             return

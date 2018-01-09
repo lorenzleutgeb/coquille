@@ -324,7 +324,7 @@ class Actionner(Thread):
                 with self.running_lock:
                     self.vim.async_call(reinfo, self, msg.err)
                     self.vim.async_call(reerror, self, self.running_dots.pop())
-                    self.ct.interupt()
+                    self.ct.silent_interupt()
                     self.running_dots = []
 
     def showError(self, pos):
