@@ -192,7 +192,7 @@ class CoqTop:
         if self.coqtop is None:
             return
         with self.write_lock:
-            self.printer.debug(">>>" + str(msg))
+            self.printer.debug(">>>" + str(msg) + "\n")
             self.coqtop.stdin.write(msg)
             self.coqtop.stdin.flush()
 
@@ -218,15 +218,13 @@ class CoqTop:
                     continue
             except OSError:
                 return None
-        self.printer.debug("\n<<<" + str(data))
+        self.printer.debug("<<<" + str(data) + "\n")
         return a.parse_response(elt)
 
     def remove_answer(self, r, msgtype):
         self.printer.parseMessage(r, msgtype)
         if isinstance(r, Err) and msgtype == 'addgoal':
-            idx = len(self.states) - step
-            self.state_id = self.states[idx]
-            self.states = self.states[0:idx]
+            self.rewind()
             return
         if not hasattr(r, 'val'):
             return
