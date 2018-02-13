@@ -44,6 +44,11 @@ class Main(object):
         self.actionner.ct = self.ct
         self.running = False
 
+    def diditdieyet(self):
+        "Checks whether the actionner thread died and re-raise its exception."
+        if not self.actionner.isAlive():
+            raise self.actionner.exception
+
     @neovim.function('CoqLaunch', sync=True)
     def launch(self, args=[]):
         if self.running:
@@ -74,32 +79,38 @@ class Main(object):
     def modify(self, args=[]):
         if not self.running:
             return
+        self.diditdieyet()
         self.actionner.add_action('modified')
 
     @neovim.function('CoqNext', sync=True)
     def next(self, args=[]):
         if not self.running:
             return
+        self.diditdieyet()
         self.actionner.add_action('next')
 
     @neovim.function('CoqUndo', sync=False)
     def undo(self, args = []):
         if not self.running:
             return
+        self.diditdieyet()
         self.actionner.add_action('undo')
 
     @neovim.function('CoqToCursor', sync=False)
     def stepToCursor(self, args=[]):
         if not self.running:
             return
+        self.diditdieyet()
         self.actionner.add_action('cursor')
 
     @neovim.function('CoqCancel')
     def cancel(self, args=[]):
+        self.diditdieyet()
         self.actionner.add_action('cancel')
 
     @neovim.function('CoqRedraw', sync=True)
     def redraw(self, args=[]):
+        self.diditdieyet()
         self.actionner.redraw(args)
 
     @neovim.function('CoqDebug', sync=True)
@@ -111,14 +122,17 @@ class Main(object):
 
     @neovim.function('CoqErrorAt', sync=True)
     def showError(self, pos):
+        self.diditdieyet()
         self.actionner.showError(pos)
 
     @neovim.function('CoqRedrawInfo', sync=True)
     def showInfo(self, info):
+        self.diditdieyet()
         self.actionner.showInfo(info)
 
     @neovim.function('CoqRedrawGoal', sync=True)
     def showGoal(self, goal):
+        self.diditdieyet()
         self.actionner.showGoal(goal)
 
 
@@ -196,6 +210,7 @@ class Actionner(Thread):
         self.redraw_asked = False
         self.error_shown = False
         self.debug_msg = ""
+        self.exception = Exception('No information')
 
     def stop(self):
         self.must_stop = True
@@ -288,22 +303,25 @@ class Actionner(Thread):
         self.actions.append(typ)
 
     def run(self):
-        while not self.must_stop:
-            if self.actions == []:
-                time.sleep(0.01)
-                continue
-            a = self.actions[0]
-            if a == 'next':
-                self.next()
-            if a == 'cursor':
-                self.cursor()
-            if a == 'undo':
-                self.undo()
-            if a == 'cancel':
-                self.cancel()
-            if a == 'modified':
-                self.check_modification()
-            self.actions = self.actions[1:]
+        try:
+            while not self.must_stop:
+                if self.actions == []:
+                    time.sleep(0.01)
+                    continue
+                a = self.actions[0]
+                if a == 'next':
+                    self.next()
+                if a == 'cursor':
+                    self.cursor()
+                if a == 'undo':
+                    self.undo()
+                if a == 'cancel':
+                    self.cancel()
+                if a == 'modified':
+                    self.check_modification()
+                self.actions = self.actions[1:]
+        except BaseException as e:
+            self.exception = e
 
     def parseMessage(self, msg, msgtype):
         if isinstance(msg, Ok):

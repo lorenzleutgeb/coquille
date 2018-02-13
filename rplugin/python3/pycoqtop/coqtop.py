@@ -15,12 +15,15 @@ class Messenger(Thread):
         self.messages = []
         self.lock = Lock()
         self.cont = True
+        self.exception = Exception('No information')
 
     def stop(self):
         self.cont = False
         self.join()
 
     def add_message(self, msg):
+        if not (self.isAlive()):
+            raise self.exception
         with self.lock:
             self.messages.insert(0, msg)
 
@@ -33,22 +36,25 @@ class Messenger(Thread):
             return self.messages == []
 
     def run(self):
-        i = 0
-        while self.cont:
+        try:
+            i = 0
+            while self.cont:
+                with self.lock:
+                    sleep = self.messages == []
+                    if not sleep:
+                        message = self.messages.pop()
+                        self.coqtop.send_cmd(message.get_string())
+
+                if sleep:
+                    time.sleep(0.2)
+                    continue
+
+                ans = self.coqtop.get_answer()
+                self.coqtop.remove_answer(ans, message.type)
             with self.lock:
-                sleep = self.messages == []
-                if not sleep:
-                    message = self.messages.pop()
-                    self.coqtop.send_cmd(message.get_string())
-
-            if sleep:
-                time.sleep(0.2)
-                continue
-
-            ans = self.coqtop.get_answer()
-            self.coqtop.remove_answer(ans, message.type)
-        with self.lock:
-            self.messages = []
+                self.messages = []
+        except BaseException as e:
+            self.exception = e
 
 class Add:
     def __init__(self, coqtop, instr):
