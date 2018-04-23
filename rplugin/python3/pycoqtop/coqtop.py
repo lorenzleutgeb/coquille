@@ -128,7 +128,7 @@ class CoqTop:
         try:
             if os.name == 'nt':
                 self.coqtop = subprocess.Popen(options + list(args),
-                    stdin = subprocess.PIPE, stdout = suprocess.PIPE,
+                    stdin = subprocess.PIPE, stdout = subprocess.PIPE,
                     stderr = subprocess.STDOUT)
             else:
                 self.coqtop = subprocess.Popen(options + list(args),
