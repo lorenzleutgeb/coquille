@@ -6,7 +6,9 @@ from threading import Lock, RLock, Thread
 
 import neovim
 
+import os
 import re
+import subprocess
 import time
 
 def recolor(obj):
@@ -49,11 +51,32 @@ class Main(object):
         if not self.actionner.isAlive():
             raise self.actionner.exception
 
+    @neovim.function('CoqVersion', sync=True)
+    def version(self, args=[]):
+        options = ['coqtop', '-print-version']
+        if os.name == 'nt':
+            coqtop = subprocess.Popen(options + list(args),
+                stdin = subprocess.PIPE, stdout = subprocess.PIPE,
+                stderr = subprocess.STDOUT)
+        else:
+            coqtop = subprocess.Popen(options + list(args),
+                stdin = subprocess.PIPE, stdout = subprocess.PIPE)
+        fd = coqtop.stdout.fileno()
+        data = os.read(fd, 0x4000).decode("utf-8")
+        version = data.split(' ')[0]
+        self.currentVersion = version
+        self.vim.command('echo "Running with coq {}"'.format(version))
+
     @neovim.function('CoqLaunch', sync=True)
     def launch(self, args=[]):
         if self.running:
             #self.vim.err_write("Coquille is already running!")
             return
+        self.version()
+        currVer = self.currentVersion.split('.')
+        if currVer[0] != "8" or int(currVer[1]) < 6:
+            raise Exception("Unsupported version {} (currently supported: >=8.6, <9)"\
+                .format(self.currentVersion))
         self.running = True
         if self.ct.restart():
             #*self.vim.eval("map(copy(a:000),'expand(v:val)')")):

@@ -29,6 +29,11 @@ Coquille uses the plugin facility of neovim, so if you run coquille for the
 first time, and after each upgrade of the plugin, you will need to run the
 `:UpdateRemotePlugins` command for coquille to be fully operational.
 
+Coquille currently supports coq version >=8.6. To check what version of coq
+will be run with coquille, you can run `:call CoqVersion()`. The version is
+checked at startup and coquille will refuse to run if you do not have the
+required version.
+
 To launch Coquille on your Coq file, run `:call CoqLaunch()` which will make the
 functions :
 
