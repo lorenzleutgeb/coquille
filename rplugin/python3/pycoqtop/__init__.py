@@ -138,6 +138,7 @@ class Main(object):
 
     @neovim.function('CoqDebug', sync=True)
     def debug(self, args=[]):
+        self.actionner.debug_wanted = True
         self.vim.command('echo "running: ' + str(self.actionner.running_dots) + '"')
         self.vim.command('echo "valid: ' + str(self.actionner.valid_dots) + '"')
         self.vim.command('echo "state: ' + str(self.actionner.ct.state_id) + '"')
@@ -233,13 +234,15 @@ class Actionner(Thread):
         self.redraw_asked = False
         self.error_shown = False
         self.debug_msg = ""
+        self.debug_wanted = False
         self.exception = Exception('No information')
 
     def stop(self):
         self.must_stop = True
 
     def debug(self, msg):
-        self.debug_msg += msg
+        if self.debug_wanted:
+            self.debug_msg += msg
 
     def flush_debug(self):
         m = self.debug_msg
