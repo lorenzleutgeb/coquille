@@ -222,7 +222,7 @@ class Requester:
 
     def waitResult(self):
         while not self.haveResult:
-            time.sleep(0.01)
+            time.sleep(0.001)
         return self.result
 
 class StepRequester(Requester):
@@ -252,6 +252,29 @@ class FullstepRequester(Requester):
         res['running'] = (eline, ecol + 1)
         res["message"] = self.obj._between(step['start'], step['stop'])
         self.setResult(res)
+
+class FullstepsRequester(FullstepRequester):
+    def __init__(self, obj, vim, cline, ccol):
+        FullstepRequester.__init__(self, obj, vim)
+        self.cline = cline
+        self.ccol = ccol
+
+    def request(self):
+        steps = []
+        with self.obj.running_lock:
+            while True:
+                encoding = 'utf-8'
+                FullstepRequester.request(self)
+                res = self.waitResult()
+                if res['step'] == None:
+                    break
+                if res['step']['stop'] <= (self.cline-1, self.ccol):
+                    self.obj.running_dots.insert(0, res['running'])
+                    self.obj.ct.advance(res['message'], encoding)
+                    self.obj.ct.goals(True)
+                else:
+                    break
+        self.setResult(steps)
 
 class BetweenRequester(Requester):
     def __init__(self, obj, start, stop):
@@ -363,16 +386,7 @@ class Actionner(Thread):
             steps = len(self.valid_dots) - len(lst)
             self.undo([steps])
         else:
-            with self.running_lock:
-                while True:
-                    res = request(self.vim, FullstepRequester(self, self.vim))
-                    if res['step'] == None: break
-                    if res['step']['stop'] <= (cline-1, ccol):
-                        self.running_dots.insert(0, res['running'])
-                        self.ct.advance(res['message'], encoding)
-                        self.ct.goals(True)
-                    else:
-                        break
+            res = request(self.vim, FullstepsRequester(self, self.vim, cline, ccol))
             self.ask_redraw()
 
     def cancel(self, args=[]):
