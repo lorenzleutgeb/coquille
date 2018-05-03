@@ -557,12 +557,6 @@ class Actionner(Thread):
 
     def redraw(self, args=[]):
         # Clear current coloring (dirty)
-        if int(self.vim.eval('b:checked')) != -1:
-            self.vim.command('call matchdelete(b:checked)')
-            self.vim.command('let b:checked = -1')
-        if int(self.vim.eval('b:sent')) != -1:
-            self.vim.command('call matchdelete(b:sent)')
-            self.vim.command('let b:sent = -1')
         if int(self.vim.eval('b:errors')) != -1:
             self.vim.command('call matchdelete(b:errors)')
             self.vim.command('let b:errors = -1')
@@ -572,13 +566,24 @@ class Actionner(Thread):
             start = { 'line': 0 , 'col': 0 }
             stop  = { 'line': line + 1, 'col': col }
             zone = self._make_matcher(start, stop)
+            if int(self.vim.eval('b:checked')) != -1:
+                self.vim.command('call matchdelete(b:checked)')
+                self.vim.command('let b:checked = -1')
             self.vim.command("let b:checked = matchadd('CheckedByCoq', '%s')" % zone)
+        elif int(self.vim.eval('b:checked')) != -1:
+            self.vim.command('call matchdelete(b:checked)')
+            self.vim.command('let b:checked = -1')
         if self.running_dots != []:
             (line, col) = self.running_dots[0]
             rstop = { 'line': line + 1, 'col': col }
             zone = self._make_matcher(stop, rstop)
+            if int(self.vim.eval('b:sent')) != -1:
+                self.vim.command('call matchdelete(b:sent)')
+                self.vim.command('let b:sent = -1')
             self.vim.command("let b:sent = matchadd('SentToCoq', '%s')" % zone)
-        time.sleep(0.01)
+        elif int(self.vim.eval('b:sent')) != -1:
+            self.vim.command('call matchdelete(b:sent)')
+            self.vim.command('let b:sent = -1')
         if self.redraw_asked:
             self.redraw_asked = False
             self.redraw(args)
