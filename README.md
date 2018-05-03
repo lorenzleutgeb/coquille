@@ -13,7 +13,7 @@ Installation
 This repository is meant to be used as a [pathogen][1] bundle. If you don't
 already use pathogen, I strongly recommend that you start right now.
 
-Installing Coquille is just as simple as doing :
+Installing Coquille is just as simple as doing:
 
     cd ~/.config/nvim/bundle
     git clone https://framagit.org/tyreunom/coquille.git
@@ -35,7 +35,7 @@ checked at startup and coquille will refuse to run if you do not have the
 required version.
 
 To launch Coquille on your Coq file, run `:call CoqLaunch()` which will make the
-functions :
+functions:
 
 - CoqNext()
 - CoqToCursor()
@@ -46,7 +46,7 @@ functions :
 available to you.
 
 By default Coquille forces no mapping for these commands, however two sets of
-mapping are already defined and you can activate them by adding :
+mapping are already defined and you can activate them by adding:
 
     " Maps Coquille commands to CoqIDE default key bindings
     au FileType coq call coquille#CoqideMapping()
@@ -100,7 +100,7 @@ You can set the following variable to modify Coquille's behavior:
 Screenshoots
 ------------
 
-Because pictures are always the best sellers :
+Because pictures are always the best sellers:
 
 ![Coquille at use](http://the-lambda-church.github.io/coquille/coquille.png)
 
