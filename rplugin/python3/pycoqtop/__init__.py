@@ -131,6 +131,41 @@ class Main(object):
         self.diditdieyet()
         self.actionner.add_action('cancel')
 
+    @neovim.function('CoqSearch', sync=True)
+    def search(self, args=[]):
+        if not self.running:
+            return
+        self.diditdieyet()
+        self.actionner.add_action('search', args)
+
+    @neovim.function('CoqCheck', sync=True)
+    def check(self, args=[]):
+        if not self.running:
+            return
+        self.diditdieyet()
+        self.actionner.add_action('check', args)
+
+    @neovim.function('CoqSearchAbout', sync=True)
+    def searchabout(self, args=[]):
+        if not self.running:
+            return
+        self.diditdieyet()
+        self.actionner.add_action('searchabout', args)
+
+    @neovim.function('CoqLocate', sync=True)
+    def locate(self, args=[]):
+        if not self.running:
+            return
+        self.diditdieyet()
+        self.actionner.add_action('locate', args)
+
+    @neovim.function('CoqPrint', sync=True)
+    def doprint(self, args=[]):
+        if not self.running:
+            return
+        self.diditdieyet()
+        self.actionner.add_action('print', args)
+
     @neovim.function('CoqRedraw', sync=True)
     def redraw(self, args=[]):
         self.diditdieyet()
@@ -325,8 +360,28 @@ class Actionner(Thread):
             self.running_dots = []
         self.ask_redraw()
 
-    def add_action(self, typ):
-        self.actions.append(typ)
+    def check(self, terms):
+        with self.running_lock:
+            self.ct.check(terms)
+
+    def doprint(self, terms):
+        with self.running_lock:
+            self.ct.doprint(terms)
+
+    def locate(self, terms):
+        with self.running_lock:
+            self.ct.locate(terms)
+
+    def search(self, terms):
+        with self.running_lock:
+            self.ct.search(terms)
+
+    def searchabout(self, terms):
+        with self.running_lock:
+            self.ct.searchabout(terms)
+
+    def add_action(self, typ, args=[]):
+        self.actions.append((typ, args))
 
     def run(self):
         try:
@@ -334,17 +389,27 @@ class Actionner(Thread):
                 if self.actions == []:
                     time.sleep(0.01)
                     continue
-                a = self.actions[0]
-                if a == 'next':
+                (typ, args) = self.actions[0]
+                if typ == 'next':
                     self.next()
-                if a == 'cursor':
+                if typ == 'cursor':
                     self.cursor()
-                if a == 'undo':
+                if typ == 'undo':
                     self.undo()
-                if a == 'cancel':
+                if typ == 'cancel':
                     self.cancel()
-                if a == 'modified':
+                if typ == 'modified':
                     self.check_modification()
+                if typ == 'check':
+                    self.check(args[0])
+                if typ == 'print':
+                    self.doprint(args[0])
+                if typ == 'locate':
+                    self.locate(args[0])
+                if typ == 'searchabout':
+                    self.searchabout(args[0])
+                if typ == 'search':
+                    self.search(args[0])
                 self.actions = self.actions[1:]
         except BaseException as e:
             self.exception = e
@@ -361,8 +426,12 @@ class Actionner(Thread):
                 self.vim.async_call(reinfo, self, msg.msg)
             if msgtype == "goal":
                 self.vim.async_call(regoal, self, msg.val)
+            if msgtype == "query":
+                self.vim.async_call(reinfo, self, msg.msg)
         elif msgtype == "goal":
             pass
+        elif msgtype == "query":
+            self.vim.async_call(reinfo, self, msg.err)
         else:
             if isinstance(msg, Err):
                 with self.running_lock:

@@ -4,6 +4,7 @@ Inl = namedtuple('Inl', ['val'])
 Inr = namedtuple('Inr', ['val'])
 
 StateId = namedtuple('StateId', ['id'])
+RouteId = namedtuple('RouteId', ['id'])
 Option = namedtuple('Option', ['val'])
 
 OptionState = namedtuple('OptionState', ['sync', 'depr', 'name', 'value'])

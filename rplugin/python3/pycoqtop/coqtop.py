@@ -66,7 +66,7 @@ class Add:
         a = API()
         return a.get_call_msg('Add', ((self.instr, -1), (self.coqtop.state_id, True)))
 
-class Query:
+class CoqQuery:
     def __init__(self, coqtop, instr):
         self.coqtop = coqtop
         self.instr = instr
@@ -74,7 +74,7 @@ class Query:
 
     def get_string(self):
         a = API()
-        return a.get_call_msg('Query', (self.instr, self.coqtop.state_id))
+        return a.get_call_msg('Query', (RouteId(0), (self.instr, self.coqtop.state_id)))
 
 class CoqGoal:
     def __init__(self, coqtop, advance = False):
@@ -164,6 +164,27 @@ class CoqTop:
 
     def advance(self, instr, encoding = 'utf8'):
         self.messenger.add_message(Add(self, instr))
+
+    def check(self, terms):
+        self.messenger.add_message(CoqQuery(self, "Check ({}).".format(terms)))
+
+    def dolocate(self, terms):
+        if " " in terms:
+            self.messenger.add_message(CoqQuery(self, "Locate ({}).".format(terms)))
+        else:
+            self.messenger.add_message(CoqQuery(self, "Locate {}.".format(terms)))
+
+    def doprint(self, terms):
+        if " " in terms:
+            self.messenger.add_message(CoqQuery(self, "Print ({}).".format(terms)))
+        else:
+            self.messenger.add_message(CoqQuery(self, "Print {}.".format(terms)))
+
+    def search(self, terms):
+        self.messenger.add_message(CoqQuery(self, "Search ({}).".format(terms)))
+
+    def searchabout(self, terms):
+        self.messenger.add_message(CoqQuery(self, "SearchAbout {}.".format(terms)))
 
     def rewind(self, step = 1):
         assert self.messenger.is_empty()

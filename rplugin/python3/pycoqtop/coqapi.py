@@ -24,6 +24,8 @@ def encode_value(v):
         return xml
     elif isinstance(v, StateId):
         return build('state_id', str(v.id))
+    elif isinstance(v, RouteId):
+        return build('route_id', str(v.id))
     elif isinstance(v, list):
         return build('list', None, [encode_value(c) for c in v])
     elif isinstance(v, Option):
@@ -61,6 +63,8 @@ def parse_value(xml):
         return int(xml.text)
     elif xml.tag == 'state_id':
         return StateId(int(xml.get('val')))
+    elif xml.tag == 'route_id':
+        return RouteId(int(xml.get('val')))
     elif xml.tag == 'list':
         return [parse_value(c) for c in xml]
     elif xml.tag == 'option':
@@ -154,11 +158,18 @@ class API:
     def parse_response(self, xml):
         messageNodes = []
         valueNodes = []
+        valueNode = None
         for c in xml.getchildren():
             if c.tag == 'value':
                 valueNodes.append(c)
             if c.tag == 'message':
                 messageNodes.append(c)
+            if c.tag == 'feedback':
+                for cc in c.getchildren():
+                    if cc.tag == 'feedback_content' and cc.get('val') == 'message':
+                        for ccc in cc.getchildren():
+                            if ccc.tag == 'message':
+                                messageNodes.append(ccc)
         if len(valueNodes) > 1:
             for c in valueNodes:
                 for d in list(parse_value(c[0])):
@@ -166,10 +177,9 @@ class API:
                         valueNode = c
         elif len(valueNodes) == 1:
             valueNode = valueNodes[0]
-        else:
-            valueNode = None
+        assert (valueNode != None), "Unexpected answer from coqtop: {}".format(ET.tostring(xml))
         if valueNode.get('val') == 'good':
             return Ok(parse_value(valueNode[0]), messageNodes)
         if valueNode.get('val') == 'fail':
             return Err(parse_value(valueNode[1]), messageNodes)
-        assert False, "Unexpected answer from coqtop: " + ET.tostring(xml)
+        assert False, "Unexpected answer from coqtop: {}".format(ET.tostring(xml))
