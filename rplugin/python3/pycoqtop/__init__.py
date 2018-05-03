@@ -383,6 +383,10 @@ class Actionner(Thread):
         with self.running_lock:
             self.ct.search(terms)
 
+    def query(self, terms):
+        with self.running_lock:
+            self.ct.query(terms)
+
     def searchabout(self, terms):
         with self.running_lock:
             self.ct.searchabout(terms)

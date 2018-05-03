@@ -58,6 +58,17 @@ function! coquille#CoqideMapping()
     imap <buffer> <silent> <C-A-Right> <C-\><C-o>:call CoqToCursor()<CR>
 endfunction
 
+function! coquille#Commands()
+    command CoqLaunch call CoqLaunch()
+    command CoqNext call CoqNext()
+    command CoqUndo call CoqUndo()
+    command CoqToCursor call CoqToCursor()
+    command CoqStop call CoqStop()
+    command CoqCancel call CoqCancel()
+    command CoqDebug call CoqDebug()
+    command -nargs=1 CoqQuery call CoqQuery(<f-args>)
+endfunction
+
 autocmd VimLeavePre * call CoqStop()
 autocmd InsertChange * call CoqModify()
 autocmd TextChanged * call CoqModify()

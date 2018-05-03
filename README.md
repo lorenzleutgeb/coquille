@@ -83,13 +83,41 @@ For instance, `:call CoqCheck("3+3")` is the same as
 Configuration
 -------------
 
-(TODO)
-
 Note that the color of the "lock zone" is hard coded and might not be pretty in
 your specific setup (depending on your terminal, colorscheme, etc).
 To change it, you can overwrite the `CheckedByCoq` and `SentToCoq` highlight
 groups (`:h hi` and `:h highlight-groups`) to colors that works better for you.
 See [coquille.vim][4] for an example.
+
+For instance, you can put this in your ~/.config/nvim/init.vim:
+
+```vim
+hi default CheckedByCoq ctermbg=10 guibg=LightGreen
+hi default SentToCoq ctermbg=12 guibg=LimeGreen
+```
+
+You can run `coquille#Commands()` to make some commands available.  By putting
+a call in your init.vim, you can make them always available.  As they may
+conflict with other coq-related extensions, they are disabled by default.  The
+following commands are available:
+
+ - CoqLaunch
+ - CoqStop
+ - CoqNext
+ - CoqCancel
+ - CoqToCursor
+ - CoqUndo
+ - CoqQuery
+ - CoqCheck
+ - CoqLocate
+ - CoqPrint
+ - CoqSearch
+ - CoqSearchAbout
+
+They work similarly to their functional counterpart, except that their arguments
+don't need to be wrapped in quotes.
+
+(TODO)
 
 You can set the following variable to modify Coquille's behavior:
 
