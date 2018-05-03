@@ -186,6 +186,9 @@ class CoqTop:
     def searchabout(self, terms):
         self.messenger.add_message(CoqQuery(self, "SearchAbout {}.".format(terms)))
 
+    def query(self, terms):
+        self.messenger.add_message(CoqQuery(self, terms))
+
     def rewind(self, step = 1):
         assert self.messenger.is_empty()
         assert step <= len(self.states)

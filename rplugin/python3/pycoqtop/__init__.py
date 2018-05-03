@@ -166,6 +166,13 @@ class Main(object):
         self.diditdieyet()
         self.actionner.add_action('print', args)
 
+    @neovim.function('CoqQuery', sync=True)
+    def query(self, args=[]):
+        if not self.running:
+            return
+        self.diditdieyet()
+        self.actionner.add_action('query', args)
+
     @neovim.function('CoqRedraw', sync=True)
     def redraw(self, args=[]):
         self.diditdieyet()
@@ -410,6 +417,8 @@ class Actionner(Thread):
                     self.searchabout(args[0])
                 if typ == 'search':
                     self.search(args[0])
+                if typ == 'query':
+                    self.query(args[0])
                 self.actions = self.actions[1:]
         except BaseException as e:
             self.exception = e

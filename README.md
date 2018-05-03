@@ -63,11 +63,22 @@ Alternatively you can, of course, define your own.
 Running query commands
 ----------------------
 
-(TODO)
-
 You can run an arbitrary query command (that is `Check`, `Print`, etc.) by
-calling `:Coq MyCommand foo bar baz.` and the result will be displayed in the
-Infos panel.
+calling `:call CoqQuery("MyCommand foo bar baz").` and the result will be
+displayed in the Infos panel.
+
+Alternatively, some commands are directly callable. The following functions are
+available:
+
+ - CoqCheck()
+ - CoqLocate()
+ - CoqPrint()
+ - CoqQuery()
+ - CoqSearch()
+ - CoqSearchAbout()
+
+For instance, `:call CoqCheck("3+3")` is the same as
+`:call CoqQuery("Check 3+3.")`.
 
 Configuration
 -------------
