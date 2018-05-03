@@ -233,6 +233,26 @@ class StepRequester(Requester):
     def request(self):
         self.setResult(self.obj.findNextStep())
 
+class FullstepRequester(Requester):
+    def __init__(self, obj, vim):
+        Requester.__init__(self)
+        self.obj = obj
+        self.vim = vim
+    
+    def request(self):
+        encoding = 'utf-8'
+        step = self.obj.findNextStep()
+        res = {'step': step}
+        if step is None:
+            self.setResult(res)
+            return
+        (eline, ecol) = step['stop']
+        line = (self.vim.current.buffer[eline])[:ecol]
+        ecol += len(bytes(line, encoding)) - len(line)
+        res['running'] = (eline, ecol + 1)
+        res["message"] = self.obj._between(step['start'], step['stop'])
+        self.setResult(res)
+
 class BetweenRequester(Requester):
     def __init__(self, obj, start, stop):
         Requester.__init__(self)
@@ -312,14 +332,12 @@ class Actionner(Thread):
         #encoding = self.vim.eval("&encoding") or 'utf-8'
         encoding = 'utf-8'
         with self.running_lock:
-            step = request(self.vim, StepRequester(self))
+            res = request(self.vim, FullstepRequester(self, self.vim))
+            step = res['step']
             if step is None: return
-            message = request(self.vim, BetweenRequester(self, step['start'], step['stop']))
-            (eline, ecol) = step['stop']
-            line = request(self.vim, LineRequester(self.vim, eline))[:ecol]
-            ecol += len(bytes(line, encoding)) - len(line)
-            self.running_dots.insert(0, (eline, ecol + 1))
-            self.ct.advance(message, encoding)
+            message = res['message']
+            self.running_dots.insert(0, res['running'])
+            self.ct.advance(res['message'], encoding)
             self.ct.goals(True)
         self.ask_redraw()
 
@@ -347,15 +365,11 @@ class Actionner(Thread):
         else:
             with self.running_lock:
                 while True:
-                    step = request(self.vim, StepRequester(self))
-                    if step is None: break
-                    if step['stop'] <= (cline - 1, ccol):
-                        (eline, ecol) = step['stop']
-                        line = request(self.vim, LineRequester(self.vim, eline))[:ecol]
-                        ecol += len(bytes(line, encoding)) - len(line)
-                        self.running_dots.insert(0, (eline, ecol + 1))
-                        message = request(self.vim, BetweenRequester(self, step['start'], step['stop']))
-                        self.ct.advance(message, encoding)
+                    res = request(self.vim, FullstepRequester(self, self.vim))
+                    if res['step'] == None: break
+                    if res['step']['stop'] <= (cline-1, ccol):
+                        self.running_dots.insert(0, res['running'])
+                        self.ct.advance(res['message'], encoding)
                         self.ct.goals(True)
                     else:
                         break
