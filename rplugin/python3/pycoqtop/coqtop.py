@@ -99,7 +99,7 @@ def escape(data):
                .replace("&#41;", ')')
 
 class CoqTop:
-    def __init__(self, printer):
+    def __init__(self, printer, binary, R):
         self.write_lock = Lock()
         self.interupted = False
         self.printer = printer
@@ -108,6 +108,8 @@ class CoqTop:
         self.state_id = None
         self.root_state = None
         self.messenger = None
+        self.coqtopbin = binary
+        self.R = R
 
     def running(self):
         return self.coqtop is None
@@ -119,12 +121,16 @@ class CoqTop:
         if self.coqtop:
             self.kill()
         self.messenger = Messenger(self)
-        options = [ 'coqtop', '-ideslave', '-main-channel', 'stdfds',
-            '-async-proofs', 'on', '-R', '.', '',
+        options = [ self.coqtopbin, '-ideslave', '-main-channel', 'stdfds',
+            '-async-proofs', 'on',
             # prevent stupid behavior where "admit"s are added when errors
             # should occur. This "error resilience" non sense make coqc and
             # coqtop act differently, and the user wouldn't expect that.
             '-async-proofs-tactic-error-resilience', 'off']
+        for r in self.R:
+            options.append('-R')
+            options.append(r[0])
+            options.append(r[1])
         try:
             if os.name == 'nt':
                 self.coqtop = subprocess.Popen(options + list(args),

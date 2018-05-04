@@ -1,6 +1,7 @@
 from .coqtop import CoqTop
 from .coqapi import Ok, Err
 from .xmltype import *
+from .projectparser import ProjectParser
 from threading import Lock, RLock, Thread
 
 
@@ -42,7 +43,10 @@ class Main(object):
     def __init__(self, vim):
         self.vim = vim
         self.actionner = Actionner(self)
-        self.ct = CoqTop(self.actionner)
+        coqproject = self.findCoqProject(os.getcwd())
+        parser = ProjectParser(coqproject)
+        self.coqtopbin = parser.getCoqtop()
+        self.ct = CoqTop(self.actionner, self.coqtopbin, parser.getR())
         self.actionner.ct = self.ct
         self.running = False
 
@@ -51,9 +55,16 @@ class Main(object):
         if not self.actionner.isAlive():
             raise self.actionner.exception
 
+    def findCoqProject(self, directory):
+        if '_CoqProject' in os.listdir(directory):
+            return directory + '/_CoqProject'
+        if len(directory.split('/')) > 2:
+            return self.findCoqProject('/'.join(directory.split('/')[:-1]))
+        return None
+
     @neovim.function('CoqVersion', sync=True)
     def version(self, args=[]):
-        options = ['coqtop', '-print-version']
+        options = [self.coqtopbin, '-print-version']
         if os.name == 'nt':
             coqtop = subprocess.Popen(options + list(args),
                 stdin = subprocess.PIPE, stdout = subprocess.PIPE,
