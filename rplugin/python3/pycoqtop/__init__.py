@@ -70,13 +70,14 @@ class Main(object):
     @neovim.function('CoqLaunch', sync=True)
     def launch(self, args=[]):
         if self.running:
-            #self.vim.err_write("Coquille is already running!")
+            self.vim.command('echo "Coquille is already running!"')
             return
         self.version()
         currVer = self.currentVersion.split('.')
         if currVer[0] != "8" or int(currVer[1]) < 6:
-            raise Exception("Unsupported version {} (currently supported: >=8.6, <9)"\
+            self.vim.command('echo "Unsupported version {} (currently supported: >=8.6, <9)"'\
                 .format(self.currentVersion))
+            return
         self.running = True
         if self.ct.restart():
             #*self.vim.eval("map(copy(a:000),'expand(v:val)')")):
