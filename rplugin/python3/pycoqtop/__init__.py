@@ -46,7 +46,7 @@ class Main(object):
         coqproject = self.findCoqProject(os.getcwd())
         parser = ProjectParser(coqproject)
         self.coqtopbin = parser.getCoqtop()
-        self.ct = CoqTop(self.actionner, self.coqtopbin, parser.getR())
+        self.ct = CoqTop(self.actionner, parser)
         self.actionner.ct = self.ct
         self.running = False
 

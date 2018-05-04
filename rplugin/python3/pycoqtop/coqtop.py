@@ -99,7 +99,7 @@ def escape(data):
                .replace("&#41;", ')')
 
 class CoqTop:
-    def __init__(self, printer, binary, R):
+    def __init__(self, printer, parser):
         self.write_lock = Lock()
         self.interupted = False
         self.printer = printer
@@ -108,8 +108,10 @@ class CoqTop:
         self.state_id = None
         self.root_state = None
         self.messenger = None
-        self.coqtopbin = binary
-        self.R = R
+        self.coqtopbin = parser.getCoqtop()
+        self.I = parser.getI()
+        self.Q = parser.getQ()
+        self.R = parser.getR()
 
     def running(self):
         return self.coqtop is None
@@ -127,6 +129,13 @@ class CoqTop:
             # should occur. This "error resilience" non sense make coqc and
             # coqtop act differently, and the user wouldn't expect that.
             '-async-proofs-tactic-error-resilience', 'off']
+        for r in self.I:
+            options.append('-I')
+            options.append(r)
+        for r in self.Q:
+            options.append('-Q')
+            options.append(r[0])
+            options.append(r[1])
         for r in self.R:
             options.append('-R')
             options.append(r[0])
