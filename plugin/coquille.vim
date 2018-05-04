@@ -19,9 +19,9 @@ function! coquille#Register()
     hi default SentToCoq ctermbg=60 guibg=LimeGreen
     hi link CoqError Error
 
-    let b:checked = -1
-    let b:sent    = -1
-    let b:errors  = -1
+    let t:checked = -1
+    let t:sent    = -1
+    let t:errors  = -1
 endfunction
 
 function! coquille#KillSession()
@@ -67,6 +67,11 @@ function! coquille#Commands()
     command CoqCancel call CoqCancel()
     command CoqDebug call CoqDebug()
     command -nargs=1 CoqQuery call CoqQuery(<f-args>)
+    command -nargs=1 CoqCheck call CoqCheck(<f-args>)
+    command -nargs=1 CoqLocate call CoqLocate(<f-args>)
+    command -nargs=1 CoqPrint call CoqPrint(<f-args>)
+    command -nargs=1 CoqSearch call CoqSearch(<f-args>)
+    command -nargs=1 CoqSearchAbout call CoqSearchAbout(<f-args>)
 endfunction
 
 autocmd VimLeavePre * call CoqStop()

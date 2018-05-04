@@ -491,7 +491,7 @@ class Actionner(Thread):
         stop = { 'line': line + 1, 'col': col }
         zone = self._make_matcher(start, stop)
         self.error_shown = True
-        self.vim.command("let b:errors = matchadd('CoqError', '%s')" % zone)
+        self.vim.command("let t:errors = matchadd('CoqError', '%s')" % zone)
 
     def showInfo(self, info):
         #self.vim.command('echo "' + str(info).replace("\"", "\\\"") + '"')
@@ -584,34 +584,45 @@ class Actionner(Thread):
                 buf.append('')
 
     def redraw(self, args=[]):
+        # Save current coloring
+        self.vim.command('let t:olderrors = t:errors')
+        self.vim.command('let t:oldchecked = t:checked')
+        self.vim.command('let t:oldsent = t:sent')
+
         # Clear current coloring (dirty)
-        if int(self.vim.eval('b:errors')) != -1:
-            self.vim.command('call matchdelete(b:errors)')
-            self.vim.command('let b:errors = -1')
+        if int(self.vim.eval('t:errors')) != -1:
+            self.vim.command('let t:errors = -1')
+        if int(self.vim.eval('t:checked')) != -1:
+            self.vim.command('let t:checked = -1')
+        if int(self.vim.eval('t:sent')) != -1:
+            self.vim.command('let t:sent = -1')
+
         stop = { 'line': 0 , 'col': 0 }
+
+        # Color again
         if self.valid_dots != []:
             (line, col) = self.valid_dots[-1]
             start = { 'line': 0 , 'col': 0 }
             stop  = { 'line': line + 1, 'col': col }
             zone = self._make_matcher(start, stop)
-            if int(self.vim.eval('b:checked')) != -1:
-                self.vim.command('call matchdelete(b:checked)')
-                self.vim.command('let b:checked = -1')
-            self.vim.command("let b:checked = matchadd('CheckedByCoq', '%s')" % zone)
-        elif int(self.vim.eval('b:checked')) != -1:
-            self.vim.command('call matchdelete(b:checked)')
-            self.vim.command('let b:checked = -1')
+            self.vim.command("let t:checked = matchadd('CheckedByCoq', '%s')" % zone)
+
         if self.running_dots != []:
             (line, col) = self.running_dots[0]
             rstop = { 'line': line + 1, 'col': col }
             zone = self._make_matcher(stop, rstop)
-            if int(self.vim.eval('b:sent')) != -1:
-                self.vim.command('call matchdelete(b:sent)')
-                self.vim.command('let b:sent = -1')
-            self.vim.command("let b:sent = matchadd('SentToCoq', '%s')" % zone)
-        elif int(self.vim.eval('b:sent')) != -1:
-            self.vim.command('call matchdelete(b:sent)')
-            self.vim.command('let b:sent = -1')
+            self.vim.command("let t:sent = matchadd('SentToCoq', '%s')" % zone)
+
+        # Clear current coloring (dirty)
+        if int(self.vim.eval('t:olderrors')) != -1:
+            self.vim.command('call matchdelete(t:olderrors)')
+        if int(self.vim.eval('t:oldsent')) != -1:
+            self.vim.command('call matchdelete(t:oldsent)')
+        if int(self.vim.eval('t:oldchecked')) != -1:
+            self.vim.command('call matchdelete(t:oldchecked)')
+
+        # If a redraw was requested during the evaluation of this one, redraw
+        # again.
         if self.redraw_asked:
             self.redraw_asked = False
             self.redraw(args)
