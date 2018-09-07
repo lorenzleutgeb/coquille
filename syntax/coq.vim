@@ -45,7 +45,7 @@ syn match   coqIdent             contained "[_[:alpha:]][_'[:alnum:]]*"
 syn keyword coqTopLevel          Declare Type Canonical Structure Cd Coercion Derive Drop Existential
 "...
 syn keyword coqVernacCmd         Functional Scheme Back Combined
-syn keyword coqFeedback          Show About Print
+syn keyword coqFeedback          Show About Print Locate
 
 " Non proofs
 syn region coqCompute contains=coqIdent matchgroup=coqTopLevel start="Check|Compute|Search|SearchAbout" end="\.\_s"
@@ -235,7 +235,7 @@ syn keyword coqTactic    contained idtac induction injection instantiate intro[s
 syn keyword coqTactic    contained lapply left move omega pattern pose proof quote
 syn keyword coqTactic    contained red refine reflexivity rename replace revert rewrite right ring
 syn keyword coqTactic    contained set simpl[e] simplify_eq split subst stepl stepr symmetry
-syn keyword coqTactic    contained transitivity trivial unfold vm_compute
+syn keyword coqTactic    contained transitivity trivial unfold vm_compute exfalso
 syn keyword coqTacticKwd contained as by in using with into after until return
 
   " The following is just to help other plugins to detect via syntax groups that we are inside a proof
