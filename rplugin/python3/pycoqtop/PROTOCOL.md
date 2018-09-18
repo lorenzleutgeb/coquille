@@ -2,12 +2,14 @@ Protocol documentation
 ======================
 
 CoqTop proposes an XML protocol to send commands and receive results.  We use
-that protocol, but it is not clearly defined anywhare.  Some documentation can
+that protocol, but it is not clearly defined anywhere.  Some documentation can
 be found here: https://github.com/siegebell/vscoq/wiki, but it is targeted
 at a specific version of the protocol, so it doesn't work with more recent
 versions of coq.  Another source of knowledge about the protocol is its
 implementation in coqide, whose latest version can be found at
 https://github.com/coq/coq/blob/master/ide/interface.mli.
+
+This document should be correct for coq 8.7 and 8.8.
 
 If you want to test something, you can run the following command to start coqtop
 in the same mode as in coquille:
@@ -62,3 +64,43 @@ and another pair of a string (containing the request) and a state\_id. Examples:
 <call val="Query"><pair><route_id val="0" /><pair><string>SearchAbout nat.</string><state_id val="1" /></pair></pair></call>
 <call val="Query"><pair><route_id val="0" /><pair><string>Search (_ = S _).</string><state_id val="1" /></pair></pair></call>
 ```
+
+### Goals
+
+The goal command is used to get the current goals. It is typically used after
+advancing or rewinding, but it can be called at any time.
+
+```xml
+<call val="Goals"><unit /></call>
+```
+
+### Advance
+
+The add command is used to advance one step forward.  Note that you cannot give
+more than one step to this commmand. For instance:
+
+```xml
+<call val="Add">
+  <pair>
+    <pair>
+      <string>Require Import module.</string>
+      <int>-1</int>
+    </pair>
+    <pair>
+      <state_id val="6" />
+      <bool val="true">True</bool>
+    </pair>
+  </pair>
+</call>
+```
+
+### Rewind
+
+The edit_at command is used to go back to an older state.
+
+```xml
+call val="Edit_at"><state_id val="6" /></call>
+```
+
+This is not used to advance forward multiple steps: for that, you have to call
+the Add command multiple times.
