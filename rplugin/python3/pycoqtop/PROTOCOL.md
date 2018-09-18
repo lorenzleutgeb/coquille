@@ -19,6 +19,19 @@ coqtop -ideslave -main-channel stdfds -async-proofs -R . '' -async-proofs-tactic
 Data types
 ----------
 
+* _Unit_: `<unit />`
+* _Bool_: `<bool val="true">True</bool>` or `<bool val="false">False</bool>`
+* _String_: `<string>my text</string>`
+* _Int_: `<int>42</int>`
+* _StateId_: `<state_id val="5" />`
+* _RouteId_: `<route_id val="3" />`
+* _List_: `<list>...</list>`
+* _Option_: `<option val="none">` or `<option val="some">...</option>`
+* _Pair_: `<pair>...<pair>`
+* _Inl_: `<union val="in_l">...</union>`
+* _Inr_: `<union val="in_r">...</union>`
+* And many more...
+
 Commands
 --------
 
