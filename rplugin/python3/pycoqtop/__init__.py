@@ -27,22 +27,12 @@ def cursor(obj):
 def undo(obj):
     obj.undo()
 
-def getlines(vim, start=1, end='$'):
-    if end == '$':
-        end = len(vim.current.buffer)
-    max = 5000
-    lines = []
-    current = start
-    while current <= end:
-        lines += vim.call('getline', current, current + max)
-        current += max + 1
-    return lines
-
 @neovim.plugin
 class Main(object):
     def __init__(self, vim):
         self.vim = vim
         self.actionner = Actionner(self)
+        self.actionner.setbuf(self.vim.current.buffer)
         coqproject = self.findCoqProject(os.getcwd())
         parser = ProjectParser(coqproject)
         self.coqtopbin = parser.getCoqtop()
@@ -246,10 +236,9 @@ class StepRequester(Requester):
         self.setResult(self.obj.findNextStep())
 
 class FullstepRequester(Requester):
-    def __init__(self, obj, vim):
+    def __init__(self, obj):
         Requester.__init__(self)
         self.obj = obj
-        self.vim = vim
     
     def request(self):
         encoding = 'utf-8'
@@ -259,15 +248,15 @@ class FullstepRequester(Requester):
             self.setResult(res)
             return
         (eline, ecol) = step['stop']
-        line = (self.vim.current.buffer[eline])[:ecol]
+        line = (self.obj.buf[eline])[:ecol]
         ecol += len(bytes(line, encoding)) - len(line)
         res['running'] = (eline, ecol + 1)
         res["message"] = self.obj._between(step['start'], step['stop'])
         self.setResult(res)
 
 class FullstepsRequester(FullstepRequester):
-    def __init__(self, obj, vim, cline, ccol):
-        FullstepRequester.__init__(self, obj, vim)
+    def __init__(self, obj, cline, ccol):
+        FullstepRequester.__init__(self, obj)
         self.cline = cline
         self.ccol = ccol
 
@@ -307,14 +296,13 @@ class CursorRequester(Requester):
         self.setResult(self.vim.current.window.cursor)
 
 class LineRequester(Requester):
-    def __init__(self, vim, line):
+    def __init__(self, buf, line):
         Requester.__init__(self)
-        self.vim = vim
+        self.buf = buf
         self.line = line
 
     def request(self):
-        buff = self.vim.current.buffer
-        self.setResult(buff[self.line])
+        self.setResult(self.buf[self.line])
 
 class Actionner(Thread):
     def __init__(self, main):
@@ -333,6 +321,12 @@ class Actionner(Thread):
         self.debug_msg = ""
         self.debug_wanted = False
         self.exception = Exception('No information')
+        self.hl_error_src = None
+        self.hl_ok_src = None
+        self.hl_progress_src = None
+
+    def setbuf(self, buf):
+        self.buf = buf
 
     def stop(self):
         self.must_stop = True
@@ -367,7 +361,7 @@ class Actionner(Thread):
         #encoding = self.vim.eval("&encoding") or 'utf-8'
         encoding = 'utf-8'
         with self.running_lock:
-            res = request(self.vim, FullstepRequester(self, self.vim))
+            res = request(self.vim, FullstepRequester(self))
             step = res['step']
             if step is None: return
             message = res['message']
@@ -398,7 +392,7 @@ class Actionner(Thread):
             steps = len(self.valid_dots) - len(lst)
             self.undo([steps])
         else:
-            res = request(self.vim, FullstepsRequester(self, self.vim, cline, ccol))
+            res = request(self.vim, FullstepsRequester(self, cline, ccol))
             self.ask_redraw()
 
     def cancel(self, args=[]):
@@ -498,12 +492,18 @@ class Actionner(Thread):
             (line, col) = (0, 0)
         else:
             (line, col) = self.valid_dots[-1]
-        start = { 'line': line + 1, 'col': col }
-        (line, col) = pos
-        stop = { 'line': line + 1, 'col': col }
-        zone = self._make_matcher(start, stop)
+        (eline, ecol) = pos
         self.error_shown = True
-        self.vim.command("let t:errors = matchadd('CoqError', '%s')" % zone)
+        self.hl_error_src = self.vim.new_highlight_source()
+        self.buf.add_highlight("CoqError", line, col, ecol if line == eline else -1,
+                src_id=self.hl_error_src)
+        if self.hl_progress_src != None:
+            self.buf.clear_highlight(self.hl_progress_src)
+            self.hl_progress_src = None
+        for i in range(line+1, eline):
+            self.buf.add_highlight("CoqError", i, 0, -1, src_id=self.hl_error_src)
+        if line != eline:
+            self.buf.add_highlight("CoqError", eline, 0, ecol, src_id=self.hl_error_src)
 
     def showInfo(self, info):
         #self.vim.command('echo "' + str(info).replace("\"", "\\\"") + '"')
@@ -596,42 +596,36 @@ class Actionner(Thread):
                 buf.append('')
 
     def redraw(self, args=[]):
-        # Save current coloring
-        self.vim.command('let t:olderrors = t:errors')
-        self.vim.command('let t:oldchecked = t:checked')
-        self.vim.command('let t:oldsent = t:sent')
-
-        # Clear current coloring (dirty)
-        if int(self.vim.eval('t:errors')) != -1:
-            self.vim.command('let t:errors = -1')
-        if int(self.vim.eval('t:checked')) != -1:
-            self.vim.command('let t:checked = -1')
-        if int(self.vim.eval('t:sent')) != -1:
-            self.vim.command('let t:sent = -1')
-
-        stop = { 'line': 0 , 'col': 0 }
-
+        old_hl_ok_src = self.hl_ok_src
+        old_hl_progress_src = self.hl_progress_src
+        self.hl_ok_src = None
+        self.hl_progress_src = None
         # Color again
+        if self.hl_error_src != None:
+            self.buf.clear_highlight(self.hl_error_src)
+            self.hl_error_src = None
         if self.valid_dots != []:
-            (line, col) = self.valid_dots[-1]
-            start = { 'line': 0 , 'col': 0 }
-            stop  = { 'line': line + 1, 'col': col }
-            zone = self._make_matcher(start, stop)
-            self.vim.command("let t:checked = matchadd('CheckedByCoq', '%s')" % zone)
-
+            (eline, ecol) = self.valid_dots[-1]
+        else:
+            (eline, ecol) = (0, 0)
         if self.running_dots != []:
             (line, col) = self.running_dots[0]
-            rstop = { 'line': line + 1, 'col': col }
-            zone = self._make_matcher(stop, rstop)
-            self.vim.command("let t:sent = matchadd('SentToCoq', '%s')" % zone)
+            self.hl_progress_src = self.vim.new_highlight_source()
+            self.buf.add_highlight("SentToCoq", eline, ecol, -1, src_id=self.hl_progress_src)
+            for i in range(eline+1, line):
+                self.buf.add_highlight("SentToCoq", i, 0, -1, src_id=self.hl_progress_src)
+            self.buf.add_highlight("SentToCoq", line, 0, col, src_id=self.hl_progress_src)
 
-        # Clear current coloring (dirty)
-        if int(self.vim.eval('t:olderrors')) != -1:
-            self.vim.command('call matchdelete(t:olderrors)')
-        if int(self.vim.eval('t:oldsent')) != -1:
-            self.vim.command('call matchdelete(t:oldsent)')
-        if int(self.vim.eval('t:oldchecked')) != -1:
-            self.vim.command('call matchdelete(t:oldchecked)')
+        if self.valid_dots != []:
+            self.hl_ok_src = self.vim.new_highlight_source()
+            for i in range(0, eline):
+                self.buf.add_highlight("CheckedByCoq", i, 0, -1, src_id=self.hl_ok_src)
+            self.buf.add_highlight("CheckedByCoq", eline, 0, ecol, src_id=self.hl_ok_src)
+
+        if old_hl_ok_src:
+            self.buf.clear_highlight(old_hl_ok_src)
+        if old_hl_progress_src:
+            self.buf.clear_highlight(old_hl_progress_src)
 
         # If a redraw was requested during the evaluation of this one, redraw
         # again.
@@ -662,9 +656,8 @@ class Actionner(Thread):
         """
         (bline, bcol) = begin
         (eline, ecol) = end
-        buf = self.vim.current.buffer
         acc = ""
-        for line, str in enumerate(buf[bline:eline + 1]):
+        for line, str in enumerate(self.buf[bline:eline + 1]):
             start = bcol if line == 0 else 0
             stop  = ecol + 1 if line == eline - bline else len(str)
             acc += str[start:stop] + '\n'
@@ -682,18 +675,17 @@ class Actionner(Thread):
         That can either be a bullet if we are in a proof, or "a string" terminated
         by a dot (outside of a comment, and not denoting a path).
         """
-        buff = self.vim.current.buffer
-        blen = len(buff)
+        blen = len(self.buf)
         bullets = ['{', '}', '-', '+', '*']
         # We start by striping all whitespaces (including \n) from the beginning of
         # the chunk.
-        while line < blen and buff[line][col:].strip() == '':
+        while line < blen and self.buf[line][col:].strip() == '':
             line += 1
             col = 0
     
         if line >= blen: return
     
-        while buff[line][col] == ' ' or buff[line][col] == '\t': # FIXME: keeping the stripped line would be
+        while self.buf[line][col] == ' ' or self.buf[line][col] == '\t': # FIXME: keeping the stripped line would be
             col += 1                                             #   more efficient.
     
         # Then we check if the first character of the chunk is a bullet.
@@ -703,13 +695,13 @@ class Actionner(Thread):
         #      might not have been sent/detected yet).
         #   2/ The bullet chars can never be used at the *beginning* of a chunk
         #      outside of a proof. So the check was unecessary.
-        if buff[line][col] in bullets:
+        if self.buf[line][col] in bullets:
             return (line, col + 1)
     
         # We might have a commentary before the bullet, we should be skiping it and
         # keep on looking.
-        tail_len = len(buff[line]) - col
-        if (tail_len - 1 > 0) and buff[line][col] == '(' and buff[line][col + 1] == '*':
+        tail_len = len(self.buf[line]) - col
+        if (tail_len - 1 > 0) and self.buf[line][col] == '(' and self.buf[line][col + 1] == '*':
             com_end = self._skip_comment(line, col + 2, 1)
             if not com_end: return
             (line, col) = com_end
@@ -725,9 +717,8 @@ class Actionner(Thread):
         Valid here means: recognized by Coq as terminating an input, so dots in
         comments, strings or ident paths are not valid.
         """
-        b = self.vim.current.buffer
-        if line >= len(b): return
-        s = b[line][col:]
+        if line >= len(self.buf): return
+        s = self.buf[line][col:]
         dot_pos = s.find('.')
         com_pos = s.find('(*')
         str_pos = s.find('"')
@@ -752,10 +743,10 @@ class Actionner(Thread):
             # just after the module name.
             # Example: [Require Import Coq.Arith]
             return self._find_dot_after(line, col + dot_pos + 1)
-        elif dot_pos + col > 0 and b[line][col + dot_pos - 1] == '.':
+        elif dot_pos + col > 0 and self.buf[line][col + dot_pos - 1] == '.':
             # FIXME? There might be a cleaner way to express this.
             # We don't want to capture ".."
-            if dot_pos + col > 1 and b[line][col + dot_pos - 2] == '.':
+            if dot_pos + col > 1 and self.buf[line][col + dot_pos - 2] == '.':
                 # But we want to capture "..."
                 return (line, dot_pos + col)
             else:
@@ -769,9 +760,8 @@ class Actionner(Thread):
         [_find_dot_after]).
         Returns the position of the end of the string.
         """
-        b = self.vim.current.buffer
-        if line >= len(b): return
-        s = b[line][col:]
+        if line >= len(self.buf): return
+        s = self.buf[line][col:]
         str_end = s.find('"')
         if str_end > -1:
             return (line, col + str_end + 1)
@@ -787,9 +777,8 @@ class Actionner(Thread):
         if nb_left == 0:
             return (line, col)
     
-        b = self.vim.current.buffer
-        if line >= len(b): return
-        s = b[line][col:]
+        if line >= len(self.buf): return
+        s = self.buf[line][col:]
         com_start = s.find('(*')
         com_end = s.find('*)')
         if com_end > -1 and (com_end < com_start or com_start == -1):
