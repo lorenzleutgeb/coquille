@@ -32,12 +32,12 @@ class Main(object):
     def __init__(self, vim):
         self.vim = vim
         self.actionner = Actionner(self)
-        self.actionner.setbuf(self.vim.current.buffer)
         coqproject = self.findCoqProject(os.getcwd())
         parser = ProjectParser(coqproject)
         self.coqtopbin = parser.getCoqtop()
         self.ct = CoqTop(self.actionner, parser)
         self.actionner.ct = self.ct
+        self.actionner.setbuf(self.vim.current.buffer)
         self.running = False
 
     def diditdieyet(self):
@@ -288,12 +288,16 @@ class BetweenRequester(Requester):
         self.setResult(self.obj._between(self.start, self.stop))
 
 class CursorRequester(Requester):
-    def __init__(self, vim):
+    def __init__(self, vim, buf):
         Requester.__init__(self)
         self.vim = vim
+        self.buf = buf
 
     def request(self):
-        self.setResult(self.vim.current.window.cursor)
+        if self.buf.name != self.vim.current.buffer.name:
+            self.setResult(None)
+        else:
+            self.setResult(self.vim.current.window.cursor)
 
 class LineRequester(Requester):
     def __init__(self, buf, line):
@@ -352,7 +356,10 @@ class Actionner(Thread):
         if self.error_shown:
             self.error_shown = False
             self.ask_redraw()
-        (cline, ccol) = request(self.vim, CursorRequester(self.vim))
+        ans = request(self.vim, CursorRequester(self.vim, self.buf))
+        if ans == None:
+            return
+        (cline, ccol) = ans
         (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
         if cline <= line or (cline == line + 1 and ccol <= col):
             self.cursor()
@@ -384,7 +391,10 @@ class Actionner(Thread):
         #encoding = self.vim.eval("&encoding") or 'utf-8'
         encoding = 'utf-8'
 
-        (cline, ccol) = request(self.vim, CursorRequester(self.vim))
+        ans = request(self.vim, CursorRequester(self.vim, self.buf))
+        if ans == None:
+            return
+        (cline, ccol) = ans
         (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
         if cline <= line or (cline == line + 1 and ccol <= col):
             predicate = lambda x: x <= (cline - 1, ccol)
@@ -600,6 +610,7 @@ class Actionner(Thread):
         old_hl_progress_src = self.hl_progress_src
         self.hl_ok_src = None
         self.hl_progress_src = None
+
         # Color again
         if self.hl_error_src != None:
             self.buf.clear_highlight(self.hl_error_src)
@@ -608,13 +619,15 @@ class Actionner(Thread):
             (eline, ecol) = self.valid_dots[-1]
         else:
             (eline, ecol) = (0, 0)
+
         if self.running_dots != []:
             (line, col) = self.running_dots[0]
             self.hl_progress_src = self.vim.new_highlight_source()
-            self.buf.add_highlight("SentToCoq", eline, ecol, -1, src_id=self.hl_progress_src)
+            self.buf.add_highlight("SentToCoq", eline, ecol, col if eline == line else -1, src_id=self.hl_progress_src)
             for i in range(eline+1, line):
                 self.buf.add_highlight("SentToCoq", i, 0, -1, src_id=self.hl_progress_src)
-            self.buf.add_highlight("SentToCoq", line, 0, col, src_id=self.hl_progress_src)
+            if line != eline:
+                self.buf.add_highlight("SentToCoq", line, 0, col, src_id=self.hl_progress_src)
 
         if self.valid_dots != []:
             self.hl_ok_src = self.vim.new_highlight_source()
