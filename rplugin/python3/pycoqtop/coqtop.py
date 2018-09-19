@@ -123,6 +123,9 @@ class CoqTop:
         self.Q = parser.getQ()
         self.R = parser.getR()
 
+    def setPrinter(self, printer):
+        self.printer = printer
+
     def running(self):
         return self.coqtop is None
 
@@ -177,6 +180,7 @@ class CoqTop:
                 pass
             self.coqtop = None
             self.messenger.stop()
+            self.messenger.join()
 
     def init(self):
         a = API()

@@ -99,6 +99,10 @@ class Main(object):
         self.ct.kill()
         self.vim.call('coquille#KillSession')
         self.actionner.join()
+        self.actionner = Actionner(self)
+        self.ct.setPrinter(self.actionner)
+        self.actionner.ct = self.ct
+        self.actionner.setbuf(self.vim.current.buffer)
 
     @neovim.function('CoqModify', sync=True)
     def modify(self, args=[]):
