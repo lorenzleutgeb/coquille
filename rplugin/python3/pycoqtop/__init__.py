@@ -30,14 +30,8 @@ def undo(obj):
 @neovim.plugin
 class Main(object):
     def __init__(self, vim):
+        self.actionner = Actionner(vim)
         self.vim = vim
-        self.actionner = Actionner(self)
-        coqproject = self.findCoqProject(os.getcwd())
-        parser = ProjectParser(coqproject)
-        self.coqtopbin = parser.getCoqtop()
-        self.ct = CoqTop(self.actionner, parser)
-        self.actionner.ct = self.ct
-        self.actionner.setbuf(self.vim.current.buffer)
         self.running = False
 
     def diditdieyet(self):
@@ -45,26 +39,9 @@ class Main(object):
         if not self.actionner.isAlive():
             raise self.actionner.exception
 
-    def findCoqProject(self, directory):
-        if '_CoqProject' in os.listdir(directory):
-            return directory + '/_CoqProject'
-        if len(directory.split('/')) > 2:
-            return self.findCoqProject('/'.join(directory.split('/')[:-1]))
-        return None
-
     @neovim.function('CoqVersion', sync=True)
     def version(self, args=[]):
-        options = [self.coqtopbin, '--print-version']
-        if os.name == 'nt':
-            coqtop = subprocess.Popen(options + list(args),
-                stdin = subprocess.PIPE, stdout = subprocess.PIPE,
-                stderr = subprocess.STDOUT)
-        else:
-            coqtop = subprocess.Popen(options + list(args),
-                stdin = subprocess.PIPE, stdout = subprocess.PIPE)
-        fd = coqtop.stdout.fileno()
-        data = os.read(fd, 0x4000).decode("utf-8")
-        version = data.split(' ')[0]
+        version = self.actionner.version(args)
         self.currentVersion = version
         self.vim.command('echo "Running with coq {}"'.format(version))
 
@@ -73,15 +50,13 @@ class Main(object):
         if self.running:
             self.vim.command('echo "Coquille is already running!"')
             return
-        self.version()
-        self.ct.currentVersion = Version(self.currentVersion.split('.'))
-        currVer = self.currentVersion.split('.')
-        if currVer[0] != "8" or int(currVer[1]) < 6:
+        self.version(args)
+        if not self.currentVersion.is_allowed():
             self.vim.command('echo "Unsupported version {} (currently supported: >=8.6, <9)"'\
                 .format(self.currentVersion))
             return
         self.running = True
-        if self.ct.restart():
+        if self.actionner.restart():
             self.vim.call('coquille#Register')
             self.vim.call('coquille#ShowPanels')
             self.actionner.start()
@@ -96,13 +71,9 @@ class Main(object):
             return
         self.running = False
         self.actionner.stop()
-        self.ct.kill()
         self.vim.call('coquille#KillSession')
         self.actionner.join()
-        self.actionner = Actionner(self)
-        self.ct.setPrinter(self.actionner)
-        self.actionner.ct = self.ct
-        self.actionner.setbuf(self.vim.current.buffer)
+        self.actionner = Actionner(self.vim)
 
     @neovim.function('CoqModify', sync=True)
     def modify(self, args=[]):
@@ -313,12 +284,17 @@ class LineRequester(Requester):
         self.setResult(self.buf[self.line])
 
 class Actionner(Thread):
-    def __init__(self, main):
+    def __init__(self, vim):
         Thread.__init__(self)
-        self.ct = None
+
+        coqproject = self.findCoqProject(os.getcwd())
+        parser = ProjectParser(coqproject)
+        self.ct = CoqTop(self, parser)
+        self.coqtopbin = parser.getCoqtop()
+        self.vim = vim
+        self.buf = self.vim.current.buffer
+
         self.must_stop = False
-        self.vim = main.vim
-        self.main = main
         self.running_lock = Lock()
         self.valid_dots = []
         self.running_dots = []
@@ -333,15 +309,39 @@ class Actionner(Thread):
         self.hl_ok_src = None
         self.hl_progress_src = None
 
-    def setbuf(self, buf):
-        self.buf = buf
+    def findCoqProject(self, directory):
+        if '_CoqProject' in os.listdir(directory):
+            return directory + '/_CoqProject'
+        if len(directory.split('/')) > 2:
+            return self.findCoqProject('/'.join(directory.split('/')[:-1]))
+        return None
+
+    def restart(self):
+        return self.ct.restart()
 
     def stop(self):
         self.must_stop = True
+        self.ct.kill()
 
     def debug(self, msg):
         if self.debug_wanted:
             self.debug_msg += msg
+
+    def version(self, args=[]):
+        options = [self.coqtopbin, '--print-version']
+        if os.name == 'nt':
+            coqtop = subprocess.Popen(options + list(args),
+                stdin = subprocess.PIPE, stdout = subprocess.PIPE,
+                stderr = subprocess.STDOUT)
+        else:
+            coqtop = subprocess.Popen(options + list(args),
+                stdin = subprocess.PIPE, stdout = subprocess.PIPE)
+        fd = coqtop.stdout.fileno()
+        data = os.read(fd, 0x4000).decode("utf-8")
+        version = data.split(' ')[0]
+        self.currentVersion = Version(version.split('.'))
+        self.ct.currentVersion = self.currentVersion
+        return self.currentVersion
 
     def flush_debug(self):
         m = self.debug_msg
@@ -369,7 +369,6 @@ class Actionner(Thread):
             self.cursor()
 
     def next(self):
-        #encoding = self.vim.eval("&encoding") or 'utf-8'
         encoding = 'utf-8'
         with self.running_lock:
             res = request(self.vim, FullstepRequester(self))
@@ -392,7 +391,6 @@ class Actionner(Thread):
         self.ask_redraw()
 
     def cursor(self, args=[]):
-        #encoding = self.vim.eval("&encoding") or 'utf-8'
         encoding = 'utf-8'
 
         ans = request(self.vim, CursorRequester(self.vim, self.buf))
@@ -529,7 +527,6 @@ class Actionner(Thread):
             self.buf.add_highlight("CoqError", eline, 0, ecol, src_id=self.hl_error_src)
 
     def showInfo(self, info):
-        #self.vim.command('echo "' + str(info).replace("\"", "\\\"") + '"')
         buf = self.find_buf("Infos")
         del buf[:]
         if isinstance(info, list):
@@ -552,7 +549,6 @@ class Actionner(Thread):
             except:
                 pass
             info = ''.join(info)
-        #self.vim.command('echo "' + str(info).replace("\"", "\\\"") + '"')
         lst = map(lambda s: s.encode('utf-8'), info.split('\n'))
         for l in lst:
             buf.append(l)
