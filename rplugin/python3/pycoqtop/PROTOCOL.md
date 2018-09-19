@@ -65,6 +65,11 @@ and another pair of a string (containing the request) and a state\_id. Examples:
 <call val="Query"><pair><route_id val="0" /><pair><string>Search (_ = S _).</string><state_id val="1" /></pair></pair></call>
 ```
 
+Before coq 8.7, the Query must not contan a RouteId, so it looks like this:
+```xml
+<call val="Query"><pair><string>Print nat.</string><state_id val="1" /></pair></call>
+```
+
 ### Goals
 
 The goal command is used to get the current goals. It is typically used after
