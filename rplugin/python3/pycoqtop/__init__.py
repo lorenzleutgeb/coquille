@@ -813,30 +813,3 @@ class Actionner(Thread):
             return self._skip_comment(line, col + com_start + 2, nb_left + 1)
         else:
             return self._skip_comment(line + 1, 0, nb_left)
-
-    def _make_matcher(self, start, stop):
-        if start['line'] == stop['line']:
-            return self._easy_matcher(start, stop)
-        else:
-            return self._hard_matcher(start, stop)
-    
-    def _easy_matcher(self, start, stop):
-        startl = ""
-        startc = ""
-        if start['line'] > 0:
-            startl = "\%>{0}l".format(start['line'] - 1)
-        if start['col'] > 0:
-            startc = "\%>{0}c".format(start['col'])
-        return '{0}{1}\%<{2}l\%<{3}c'.format(startl, startc, stop['line'] + 1, stop['col'] + 1)
-    
-    def _hard_matcher(self, start, stop):
-        first_start = {'line' : start['line'], 'col' : start['col']}
-        first_stop =  {'line' : start['line'], 'col' : 4242}
-        first_line = self._easy_matcher(first_start, first_stop)
-        mid_start = {'line' : start['line']+1, 'col' : 0}
-        mid_stop =  {'line' : stop['line']-1 , 'col' : 4242}
-        middle = self._easy_matcher(mid_start, mid_stop)
-        last_start = {'line' : stop['line'], 'col' : 0}
-        last_stop =  {'line' : stop['line'], 'col' : stop['col']}
-        last_line = self._easy_matcher(last_start, last_stop)
-        return "{0}\|{1}\|{2}".format(first_line, middle, last_line)
