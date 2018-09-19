@@ -470,6 +470,15 @@ class Actionner(Thread):
                 self.actions = self.actions[1:]
         except BaseException as e:
             self.exception = e
+        if self.hl_ok_src != None:
+            self.buf.clear_highlight(self.hl_ok_src)
+            self.hl_ok_src = None
+        if self.hl_progress_src != None:
+            self.buf.clear_highlight(self.hl_progress_src)
+            self.hl_progress_src = None
+        if self.hl_error_src != None:
+            self.buf.clear_highlight(self.hl_error_src)
+            self.hl_error_src = None
 
     def parseMessage(self, msg, msgtype):
         if isinstance(msg, Ok):
