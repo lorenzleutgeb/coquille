@@ -1,4 +1,4 @@
-from .coqtop import CoqTop
+from .coqtop import CoqTop, Version
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
@@ -74,6 +74,7 @@ class Main(object):
             self.vim.command('echo "Coquille is already running!"')
             return
         self.version()
+        self.ct.currentVersion = Version(self.currentVersion.split('.'))
         currVer = self.currentVersion.split('.')
         if currVer[0] != "8" or int(currVer[1]) < 6:
             self.vim.command('echo "Unsupported version {} (currently supported: >=8.6, <9)"'\
@@ -81,7 +82,6 @@ class Main(object):
             return
         self.running = True
         if self.ct.restart():
-            #*self.vim.eval("map(copy(a:000),'expand(v:val)')")):
             self.vim.call('coquille#Register')
             self.vim.call('coquille#ShowPanels')
             self.actionner.start()

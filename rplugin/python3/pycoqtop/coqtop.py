@@ -8,6 +8,13 @@ from threading import Thread, Lock
 from pycoqtop.coqapi import API, Ok, Err
 from pycoqtop.xmltype import *
 
+class Version:
+    def __init__(self, version):
+        self.currentVersion = version
+
+    def is86(self):
+        return self.currentVersion[0] == '8' and self.currentVersion[1] == '6'
+
 class Messenger(Thread):
     def __init__(self, coqtop):
         Thread.__init__(self)
@@ -74,7 +81,10 @@ class CoqQuery:
 
     def get_string(self):
         a = API()
-        return a.get_call_msg('Query', (RouteId(0), (self.instr, self.coqtop.state_id)))
+        if self.coqtop.currentVersion.is86():
+            return a.get_call_msg('Query', (self.instr, self.coqtop.state_id))
+        else:
+            return a.get_call_msg('Query', (RouteId(0), (self.instr, self.coqtop.state_id)))
 
 class CoqGoal:
     def __init__(self, coqtop, advance = False):
