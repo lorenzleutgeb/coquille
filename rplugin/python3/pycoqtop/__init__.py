@@ -425,7 +425,7 @@ class Actionner(Thread):
 
     def locate(self, terms):
         with self.running_lock:
-            self.ct.locate(terms)
+            self.ct.dolocate(terms)
 
     def search(self, terms):
         with self.running_lock:
