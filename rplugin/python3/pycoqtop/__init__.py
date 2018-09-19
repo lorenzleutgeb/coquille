@@ -565,15 +565,16 @@ class Actionner(Thread):
 
     def showGoal(self, goal):
         buf = self.find_buf("Goals")
-        del buf[:]
+        blines = []
         if goal is None:
+            del buf[:]
             return
         if (not hasattr(goal, 'val')) and (isinstance(goal, tuple) or isinstance(goal, list)):
             for g in goal:
                 return self.showGoal(g)
             return
         if goal.val is None:
-            buf.append('No goals.')
+            blines.append('No goals.')
         else:
             goals = goal.val
             sub_goals = goals.fg
@@ -582,7 +583,8 @@ class Actionner(Thread):
             nb_unfocused = self.focused(unfocused_goals)
             nb_subgoals = len(sub_goals)
             plural_opt = '' if nb_subgoals == 1 else 's'
-            buf.append(['%d subgoal%s (%d unfocused)' % (nb_subgoals, plural_opt, nb_unfocused), ''])
+            blines.append('%d subgoal%s (%d unfocused)' % (nb_subgoals, plural_opt, nb_unfocused))
+            blines.append('')
 
             for idx, sub_goal in enumerate(sub_goals):
                 _id = sub_goal.id
@@ -606,13 +608,15 @@ class Actionner(Thread):
                             hyp = ''.join(hyp)
                         lst = map(lambda s: s.encode('utf-8'), hyp.split('\n'))
                         for line in lst:
-                            buf.append(line)
-                buf.append('')
-                buf.append('======================== ( %d / %d )' % (idx+1 , nb_subgoals))
+                            blines.append(line)
+                blines.append('')
+                blines.append('======================== ( %d / %d )' % (idx+1 , nb_subgoals))
                 lines = map(lambda s: s.encode('utf-8'), ccl.split('\n'))
                 for line in lines:
-                    buf.append(line)
-                buf.append('')
+                    blines.append(line)
+                blines.append('')
+        del buf[:]
+        buf.append(blines)
 
     def redraw(self, args=[]):
         old_hl_ok_src = self.hl_ok_src
