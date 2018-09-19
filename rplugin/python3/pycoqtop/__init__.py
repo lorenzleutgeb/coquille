@@ -54,7 +54,7 @@ class Main(object):
 
     @neovim.function('CoqVersion', sync=True)
     def version(self, args=[]):
-        options = [self.coqtopbin, '-print-version']
+        options = [self.coqtopbin, '--print-version']
         if os.name == 'nt':
             coqtop = subprocess.Popen(options + list(args),
                 stdin = subprocess.PIPE, stdout = subprocess.PIPE,
