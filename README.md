@@ -132,6 +132,16 @@ Because pictures are always the best sellers:
 
 ![Coquille at use](http://the-lambda-church.github.io/coquille/coquille.png)
 
+Testing
+-------
+
+For testing, you need python-pytest. Go to the `rplugin/python3/pycoqtop`
+directory and run:
+
+```bash
+py.test
+```
+
 [1]: https://github.com/tpope/vim-pathogen
 [2]: http://www.vim.org/scripts/script.php?script_id=2063 "coq syntax on vim.org"
 [3]: http://www.vim.org/scripts/script.php?script_id=2079 "coq indent on vim.org"

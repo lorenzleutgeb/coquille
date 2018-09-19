@@ -24,7 +24,7 @@ class ProjectParser():
             self.coqtop = self.variables['COQBIN'] + '/coqtop'
 
     def parseLine(self, sline):
-        if len(sline) < 3:
+        if len(sline) < 2:
             return
         if sline[0] == '-R':
             self.R.append((sline[1].strip("\"'"), sline[2].strip("\"'")))
