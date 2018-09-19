@@ -15,6 +15,13 @@ class Version:
     def is86(self):
         return self.currentVersion[0] == '8' and self.currentVersion[1] == '6'
 
+    def is_allowed(self):
+        return (self.currentVersion[0] == '8') and (int(self.currentVersion[1]) >= 6)
+
+    def __str__(self):
+        return '.'.join(self.currentVersion)
+
+
 class Messenger(Thread):
     def __init__(self, coqtop):
         Thread.__init__(self)
@@ -255,7 +262,7 @@ class CoqTop:
             self.coqtop.stdin.write(msg)
             self.coqtop.stdin.flush()
 
-    def get_answer(self):
+    def recv_answer(self):
         if self.coqtop is None:
             return
         fd = self.coqtop.stdout.fileno()
@@ -278,6 +285,11 @@ class CoqTop:
             except OSError:
                 return None
         self.printer.debug("<<<" + str(data) + "\n")
+        return elt
+
+    def get_answer(self):
+        a = API()
+        elt = self.recv_answer()
         return a.parse_response(elt)
 
     def remove_answer(self, r, msgtype):
