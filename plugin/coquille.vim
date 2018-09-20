@@ -74,6 +74,10 @@ function! coquille#Commands()
     command -nargs=1 CoqSearchAbout call CoqSearchAbout(<f-args>)
 endfunction
 
+if !exists('coquille_auto_move')
+  let g:coquille_auto_move="false"
+endif
+
 autocmd VimLeavePre * call CoqStop()
 autocmd InsertChange * call CoqModify()
 autocmd TextChanged * call CoqModify()

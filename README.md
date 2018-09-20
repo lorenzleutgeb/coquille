@@ -117,8 +117,6 @@ following commands are available:
 They work similarly to their functional counterpart, except that their arguments
 don't need to be wrapped in quotes.
 
-(TODO)
-
 You can set the following variable to modify Coquille's behavior:
 
     g:coquille_auto_move            Set it to 'true' if you want Coquille to

@@ -26,6 +26,8 @@ def cursor(obj):
     obj.cursor()
 def undo(obj):
     obj.undo()
+def goto_last_dot(obj):
+    obj.goto_last_dot()
 
 @neovim.plugin
 class Main(object):
@@ -388,6 +390,8 @@ class Actionner(Thread):
             self.ct.rewind(steps)
             self.valid_dots = self.valid_dots[:len(self.valid_dots) - steps]
             self.ct.goals()
+        if len(args) == 0:
+            self.vim.async_call(goto_last_dot, self)
         self.ask_redraw()
 
     def cursor(self, args=[]):
@@ -406,6 +410,13 @@ class Actionner(Thread):
         else:
             res = request(self.vim, FullstepsRequester(self, cline, ccol))
             self.ask_redraw()
+
+    def goto_last_dot(self):
+        if self.vim.eval("g:coquille_auto_move") == 'true':
+            (line, col) = (0,1) if self.valid_dots == [] else self.valid_dots[-1]
+            (line, col) = (line,col) if self.running_dots == [] else self.running_dots[-1]
+            if self.buf.name == self.vim.current.buffer.name:
+                self.vim.current.window.cursor = (line+1, col)
 
     def cancel(self, args=[]):
         with self.running_lock:
@@ -490,6 +501,7 @@ class Actionner(Thread):
                     if self.running_dots != []:
                         dot = self.running_dots.pop()
                         self.valid_dots.append(dot)
+                self.vim.async_call(goto_last_dot, self)
                 self.ask_redraw()
                 self.vim.async_call(reinfo, self, msg.msg)
             if msgtype == "goal":
