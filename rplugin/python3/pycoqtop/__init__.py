@@ -1,16 +1,16 @@
+import neovim
+
 from .coqtop import CoqTop, Version
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
 from threading import Lock, RLock, Thread
 
-
-import neovim
-
 import os
 import re
 import subprocess
 import time
+import uuid
 
 def recolor(obj):
     obj.redraw()
@@ -32,153 +32,195 @@ def goto_last_dot(obj):
 @neovim.plugin
 class Main(object):
     def __init__(self, vim):
-        self.actionner = Actionner(vim)
+        self.actionners = {}
         self.vim = vim
-        self.running = False
+        self.vim.command("let w:coquille_running='false'")
 
     def diditdieyet(self):
         "Checks whether the actionner thread died and re-raise its exception."
-        if not self.actionner.isAlive():
-            raise self.actionner.exception
-
-    @neovim.function('CoqVersion', sync=True)
-    def version(self, args=[]):
-        version = self.actionner.version(args)
-        self.currentVersion = version
-        self.vim.command('echo "Running with coq {}"'.format(version))
+        for name in self.actionners:
+            actionner = self.actionners[name]
+            if not actionner.isAlive():
+                raise actionner.exception
 
     @neovim.function('CoqLaunch', sync=True)
     def launch(self, args=[]):
-        if self.running:
-            self.vim.command('echo "Coquille is already running!"')
+        if self.vim.eval("w:coquille_running") != 'false':
+            self.vim.command('echo "Coquille is already running in this window!"')
             return
-        self.version(args)
+        random_name = str(uuid.uuid4())
+        self.actionners[random_name] = Actionner(self.vim)
+        self.currentVersion = self.actionners[random_name].version(args)
         if not self.currentVersion.is_allowed():
+            self.actionners[random_name].stop()
+            self.actionners[random_name].join()
             self.vim.command('echo "Unsupported version {} (currently supported: >=8.6, <9)"'\
                 .format(self.currentVersion))
             return
-        self.running = True
-        if self.actionner.restart():
+        self.vim.command("let w:coquille_running='"+random_name+"'")
+        if self.actionners[random_name].restart():
             self.vim.call('coquille#Register')
             self.vim.call('coquille#ShowPanels')
-            self.actionner.start()
+            self.actionners[random_name].start()
         else:
             self.vim.command('echo "Coq could not be launched!"')
-            self.running = False
+            self.vim.command("let w:coquille_running='false'")
 
     @neovim.function('CoqStop', sync=True)
     def stop(self, args=[]):
-        if not self.running:
-            self.vim.err_write('Coquille is already stopped!')
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
-        self.running = False
-        self.actionner.stop()
+        actionner = self.actionners[name]
+        self.vim.command("let w:coquille_running='false'")
+        actionner.stop()
         self.vim.call('coquille#KillSession')
-        self.actionner.join()
-        self.actionner = Actionner(self.vim)
+        actionner.join()
 
     @neovim.function('CoqModify', sync=True)
     def modify(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('modified')
+        actionner.add_action('modified')
 
     @neovim.function('CoqNext', sync=True)
     def next(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('next')
+        actionner.add_action('next')
 
     @neovim.function('CoqUndo', sync=False)
     def undo(self, args = []):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('undo')
+        actionner.add_action('undo')
 
     @neovim.function('CoqToCursor', sync=False)
     def stepToCursor(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('cursor')
+        actionner.add_action('cursor')
 
     @neovim.function('CoqCancel')
     def cancel(self, args=[]):
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
+            return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('cancel')
+        actionner.add_action('cancel')
 
     @neovim.function('CoqSearch', sync=True)
     def search(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('search', args)
+        actionner.add_action('search', args)
 
     @neovim.function('CoqCheck', sync=True)
     def check(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('check', args)
+        actionner.add_action('check', args)
 
     @neovim.function('CoqSearchAbout', sync=True)
     def searchabout(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('searchabout', args)
+        actionner.add_action('searchabout', args)
 
     @neovim.function('CoqLocate', sync=True)
     def locate(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('locate', args)
+        actionner.add_action('locate', args)
 
     @neovim.function('CoqPrint', sync=True)
     def doprint(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('print', args)
+        actionner.add_action('print', args)
 
     @neovim.function('CoqQuery', sync=True)
     def query(self, args=[]):
-        if not self.running:
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
             return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.add_action('query', args)
+        actionner.add_action('query', args)
 
     @neovim.function('CoqRedraw', sync=True)
     def redraw(self, args=[]):
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
+            return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.redraw(args)
+        actionner.redraw(args)
 
     @neovim.function('CoqDebug', sync=True)
     def debug(self, args=[]):
-        self.actionner.debug_wanted = True
-        self.vim.command('echo "running: ' + str(self.actionner.running_dots) + '"')
-        self.vim.command('echo "valid: ' + str(self.actionner.valid_dots) + '"')
-        self.vim.command('echo "state: ' + str(self.actionner.ct.state_id) + '"')
-        self.vim.command('echo "debug: '+str(self.actionner.flush_debug()).replace("\"", "\\\"")+'"')
+        name = self.vim.eval("w:coquille_running")
+        actionner = self.actionners[name]
+        actionner.debug_wanted = True
+        self.vim.command('echo "running: ' + str(actionner.running_dots) + '"')
+        self.vim.command('echo "valid: ' + str(actionner.valid_dots) + '"')
+        self.vim.command('echo "state: ' + str(actionner.ct.state_id) + '"')
+        self.vim.command('echo "debug: '+str(actionner.flush_debug()).replace("\"", "\\\"")+'"')
 
     @neovim.function('CoqErrorAt', sync=True)
     def showError(self, pos):
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
+            return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.showError(pos)
+        actionner.showError(pos)
 
     @neovim.function('CoqRedrawInfo', sync=True)
     def showInfo(self, info):
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
+            return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.showInfo(info)
+        actionner.showInfo(info)
 
     @neovim.function('CoqRedrawGoal', sync=True)
     def showGoal(self, goal):
+        name = self.vim.eval("w:coquille_running")
+        if name == 'false':
+            return
+        actionner = self.actionners[name]
         self.diditdieyet()
-        self.actionner.showGoal(goal)
+        actionner.showGoal(goal)
 
 
 # Start a request from a thread
@@ -319,6 +361,7 @@ class Actionner(Thread):
         return None
 
     def restart(self):
+        self.buf = self.vim.current.buffer
         return self.ct.restart()
 
     def stop(self):

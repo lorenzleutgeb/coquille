@@ -5,8 +5,8 @@ import signal
 import time
 from threading import Thread, Lock
 
-from pycoqtop.coqapi import API, Ok, Err
-from pycoqtop.xmltype import *
+from .coqapi import API, Ok, Err
+from .xmltype import *
 
 class Version:
     def __init__(self, version):

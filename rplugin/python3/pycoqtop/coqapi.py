@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-from pycoqtop.xmltype import *
+from .xmltype import *
 
 def build(tag, val=None, children=[]):
     attribs = {'val': val} if val is not None else {}

@@ -78,7 +78,16 @@ if !exists('coquille_auto_move')
   let g:coquille_auto_move="false"
 endif
 
+function! coquille#stop()
+    if !exists('coquille_running')
+        let w:coquille_running="false"
+    else
+        call CoqStop()
+    endif
+endfunction
+
 autocmd VimLeavePre * call CoqStop()
+autocmd BufReadPre * call coquille#stop()
 autocmd InsertChange * call CoqModify()
 autocmd TextChanged * call CoqModify()
 autocmd TextChangedI * call CoqModify()
