@@ -132,6 +132,10 @@ Because pictures are always the best sellers:
 
 ![Coquille at use](http://the-lambda-church.github.io/coquille/coquille.png)
 
+And videos are even better:
+
+[![asciicast](https://asciinema.org/a/MIhWjjrKrhAciiIqhaaVpGnfk.png?theme=solarized-dark)](https://asciinema.org/a/MIhWjjrKrhAciiIqhaaVpGnfk?theme=solarized-dark)
+
 Testing
 -------
 
