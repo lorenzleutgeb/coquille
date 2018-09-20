@@ -22,6 +22,12 @@ Note that by default, coquille ships Vincent Aravantinos [syntax][2] and
 [indent][3] scripts for Coq, as well as an ftdetect script. If you already have
 those in your neovim config, then just switch to the master branch.
 
+It is possible to use Coquille without pathogen. After all, neovim is able to
+manage plugins by itself as long as you tell it where to look. Without pathogen,
+you can add this line to your `~/.config/nvim/init.vim`:
+
+    set runtimepath+=~/.config/nvim/bundle/coquille
+
 Getting started
 ---------------
 
