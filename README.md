@@ -5,7 +5,9 @@ Coquille is a vim plugin aiming to bring the interactivity of CoqIDE into your
 favorite editor.
 
 This repository contains a port of coquille to neovim, with full asynchronous
-support, and to the latest coq version.
+support, and to the latest coq version. Currently supported versions are 8.6,
+8.7 and 8.8. We will keep support for older versions and add support for newer
+versions as they are released.
 
 Installation
 ------------
