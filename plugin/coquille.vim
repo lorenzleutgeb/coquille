@@ -58,22 +58,6 @@ function! coquille#CoqideMapping()
     imap <buffer> <silent> <C-A-Right> <C-\><C-o>:call CoqToCursor()<CR>
 endfunction
 
-function! coquille#Commands()
-    command CoqLaunch call CoqLaunch()
-    command CoqNext call CoqNext()
-    command CoqUndo call CoqUndo()
-    command CoqToCursor call CoqToCursor()
-    command CoqStop call CoqStop()
-    command CoqCancel call CoqCancel()
-    command CoqDebug call CoqDebug()
-    command -nargs=1 CoqQuery call CoqQuery(<f-args>)
-    command -nargs=1 CoqCheck call CoqCheck(<f-args>)
-    command -nargs=1 CoqLocate call CoqLocate(<f-args>)
-    command -nargs=1 CoqPrint call CoqPrint(<f-args>)
-    command -nargs=1 CoqSearch call CoqSearch(<f-args>)
-    command -nargs=1 CoqSearchAbout call CoqSearchAbout(<f-args>)
-endfunction
-
 if !exists('coquille_auto_move')
   let g:coquille_auto_move="false"
 endif
