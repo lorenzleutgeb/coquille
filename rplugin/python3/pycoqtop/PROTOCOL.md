@@ -15,7 +15,7 @@ If you want to test something, you can run the following command to start coqtop
 in the same mode as in coquille:
 
 ```bash
-coqtop -ideslave -main-channel stdfds -async-proofs -R . '' -async-proofs-tactic-error-resilience off
+coqtop -ideslave -main-channel stdfds -async-proofs on -R . '' -async-proofs-tactic-error-resilience off
 ```
 
 Data types
