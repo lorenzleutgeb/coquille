@@ -29,4 +29,6 @@ def test_version():
 
 def test_init():
     printer = FakePrinter()
-    CoqTop(printer, ProjectParser("test_data/emptyCoqProject"))
+    ct = CoqTop(printer, ProjectParser("test_data/emptyCoqProject"))
+    assert ct.restart()
+    ct.kill()
