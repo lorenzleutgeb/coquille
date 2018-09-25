@@ -33,6 +33,8 @@ def goto_last_dot(obj):
 class Main(object):
     def __init__(self, vim):
         self.actionners = {}
+        self.info_wins = {}
+        self.goal_wins = {}
         self.vim = vim
         self.vim.command("let w:coquille_running='false'")
 
@@ -61,6 +63,10 @@ class Main(object):
         if self.actionners[random_name].restart():
             self.vim.call('coquille#Register')
             self.vim.call('coquille#ShowPanels')
+            self.info_wins[random_name] = self.vim.eval("g:new_info_buf")
+            self.goal_wins[random_name] = self.vim.eval("g:new_goal_buf")
+            self.actionners[random_name].goal_buf = self.vim.eval("g:new_goal_buf")
+            self.actionners[random_name].info_buf = self.vim.eval("g:new_info_buf")
             self.actionners[random_name].start()
         else:
             self.vim.command('echo "Coq could not be launched!"')
@@ -75,7 +81,13 @@ class Main(object):
         self.vim.command("let w:coquille_running='false'")
         actionner.stop()
         self.vim.call('coquille#KillSession')
+        self.vim.command('bdelete '+str(self.info_wins[name]))
+        self.vim.command('bdelete '+str(self.goal_wins[name]))
+        self.vim.command('echo "Wins: ' + str(self.goal_wins) + '"')
         actionner.join()
+        del self.actionners[name]
+        del self.goal_wins[name]
+        del self.info_wins[name]
 
     @neovim.function('CoqModify', sync=True)
     def modify(self, args=[]):
@@ -91,6 +103,7 @@ class Main(object):
         name = self.vim.eval("w:coquille_running")
         if name == 'false':
             return
+        self.vim.command('echo "'+name+'"')
         actionner = self.actionners[name]
         self.diditdieyet()
         actionner.add_action('next')
@@ -582,7 +595,7 @@ class Actionner(Thread):
             self.buf.add_highlight("CoqError", eline, 0, ecol, src_id=self.hl_error_src)
 
     def showInfo(self, info):
-        buf = self.find_buf("Infos")
+        buf = self.find_buf(self.info_buf)
         del buf[:]
         if isinstance(info, list):
             for i in info:
@@ -619,7 +632,7 @@ class Actionner(Thread):
         return s
 
     def showGoal(self, goal):
-        buf = self.find_buf("Goals")
+        buf = self.find_buf(self.goal_buf)
         blines = []
         if goal is None:
             del buf[:]
@@ -723,10 +736,9 @@ class Actionner(Thread):
             (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
         return self._get_message_range((line, col))
 
-    def find_buf(self, name):
-        buff = None
+    def find_buf(self, num):
         for b in self.vim.buffers:
-            if re.match(".*"+name+"$", b.name):
+            if num == b.number:
                 return b
         return None
 
