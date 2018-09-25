@@ -1,17 +1,22 @@
 function! coquille#ShowPanels()
     " open the Goals & Infos panels before going back to the main window
     let l:winnb = winnr()
+    let g:new_coquille = w:coquille_running
     rightbelow vnew Goals
         setlocal buftype=nofile
         setlocal filetype=coq-goals
         setlocal noswapfile
-        let s:goal_buf = bufnr("%")
+        let w:coquille_running=g:new_coquille
+        let g:new_goal_buf = bufnr("%")
     rightbelow new Infos
         setlocal buftype=nofile
         setlocal filetype=coq-infos
         setlocal noswapfile
-        let s:info_buf = bufnr("%")
+        let w:coquille_running=g:new_coquille
+        let g:new_info_buf = bufnr("%")
     execute l:winnb . 'winc w'
+    let w:info_buf = g:new_info_buf
+    let w:goal_buf = g:new_goal_buf
 endfunction
 
 function! coquille#Register()
@@ -25,8 +30,8 @@ function! coquille#Register()
 endfunction
 
 function! coquille#KillSession()
-    execute 'bdelete' . s:goal_buf
-    execute 'bdelete' . s:info_buf
+    execute 'bdelete' . w:goal_buf
+    execute 'bdelete' . w:info_buf
 
     setlocal ei=InsertEnter
 endfunction
