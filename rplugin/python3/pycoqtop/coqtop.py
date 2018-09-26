@@ -272,11 +272,11 @@ class CoqTop:
         elt = None
         while shouldWait:
             try:
-                time.sleep(0.01)
+                time.sleep(0.001)
                 if self.interupted:
                     self.interupted = False
                     return None
-                data += os.read(fd, 0x4000)
+                data += os.read(fd, 0x400000)
                 try:
                     elt = ET.fromstring('<coqtoproot>' + escape(data) + '</coqtoproot>')
                     shouldWait = a.response_end(elt)
