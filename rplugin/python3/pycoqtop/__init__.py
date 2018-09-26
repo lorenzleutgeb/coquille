@@ -84,6 +84,7 @@ class Main(object):
         self.vim.command('bdelete '+str(self.info_wins[name]))
         self.vim.command('bdelete '+str(self.goal_wins[name]))
         self.vim.command('echo "Wins: ' + str(self.goal_wins) + '"')
+        self.vim.command("let w:coquille_running='false'")
         actionner.join()
         del self.actionners[name]
         del self.goal_wins[name]
