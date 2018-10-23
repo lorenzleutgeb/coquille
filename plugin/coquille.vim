@@ -17,6 +17,9 @@ function! coquille#ShowPanels()
         let w:coquille_running=g:new_coquille
         let g:new_info_buf = bufnr("%")
     execute l:winnb . 'winc w'
+    autocmd InsertChange <buffer> call CoqModify()
+    autocmd TextChanged <buffer> call CoqModify()
+    autocmd TextChangedI <buffer> call CoqModify()
 endfunction
 
 function! coquille#Register()
@@ -68,9 +71,6 @@ function! coquille#stop()
     endif
 endfunction
 
-autocmd VimLeavePre * call CoqStop()
-autocmd QuitPre * call CoqStop()
+autocmd VimLeavePre * call coquille#stop()
+autocmd QuitPre * call coquille#stop()
 autocmd BufReadPre * call coquille#stop()
-autocmd InsertChange * call CoqModify()
-autocmd TextChanged * call CoqModify()
-autocmd TextChangedI * call CoqModify()
