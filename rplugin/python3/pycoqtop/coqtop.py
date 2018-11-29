@@ -6,6 +6,7 @@ import time
 from threading import Thread, Lock
 
 from .coqapi import API, Ok, Err
+from .coqxml import CoqParser
 from .xmltype import *
 
 class Version:
@@ -26,6 +27,7 @@ class Messenger(Thread):
     def __init__(self, coqtop):
         Thread.__init__(self)
         self.coqtop = coqtop
+        self.printer = self.coqtop.printer
         self.messages = []
         self.lock = Lock()
         self.cont = True
@@ -38,6 +40,7 @@ class Messenger(Thread):
     def add_message(self, msg):
         if not (self.isAlive()):
             raise self.exception
+        self.printer.debug(">< ADDING MESSAGE ><\n")
         with self.lock:
             self.messages.insert(0, msg)
 
@@ -56,15 +59,17 @@ class Messenger(Thread):
                 with self.lock:
                     sleep = self.messages == []
                     if not sleep:
+                        self.printer.debug(">< SENDING NEXT MESSAGE ><\n")
                         message = self.messages.pop()
                         self.coqtop.send_cmd(message.get_string())
+                        self.printer.debug(">< NEXT MESSAGE SENT ><\n")
 
                 if sleep:
                     time.sleep(0.2)
                     continue
 
-                ans = self.coqtop.get_answer()
-                self.coqtop.remove_answer(ans, message.type)
+                answer = self.coqtop.parser.nextAnswer()
+                self.coqtop.remove_answer(answer, message.type)
             with self.lock:
                 self.messages = []
         except BaseException as e:
@@ -107,13 +112,6 @@ class CoqGoal:
 
 def ignore_sigint():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-def escape(data):
-    return data.decode('utf-8') \
-               .replace("&nbsp;", ' ') \
-               .replace("&apos;", '\'') \
-               .replace("&#40;", '(') \
-               .replace("&#41;", ')')
 
 class CoqTop:
     def __init__(self, printer, parser):
@@ -169,11 +167,13 @@ class CoqTop:
                 self.coqtop = subprocess.Popen(options + list(args),
                     stdin = subprocess.PIPE, stdout = subprocess.PIPE,
                     preexec_fn = ignore_sigint)
-            self.messenger.start()
             r = self.init()
+            self.printer.debug("\n>< INIT DONE ><\n")
             assert isinstance(r, Ok)
-            self.root_state = r.val
-            self.state_id = r.val
+            self.messenger.start()
+            self.root_state = r.state_id
+            # Probably wrong:
+            self.state_id = r.state_id
         except OSError:
             return False
         return True
@@ -187,13 +187,16 @@ class CoqTop:
                 pass
             self.coqtop = None
             self.messenger.stop()
+            self.parser.stop()
             self.messenger.join()
 
     def init(self):
         a = API()
         message = a.get_init_msg()
         self.send_cmd(message)
-        return self.get_answer()
+        self.parser = CoqParser(self.coqtop, self.printer)
+        self.parser.start()
+        return self.parser.nextAnswer()
 
     def goals(self, advance = False):
         self.messenger.add_message(CoqGoal(self, advance))
@@ -235,7 +238,7 @@ class CoqTop:
             a = API()
             message = a.get_call_msg('Edit_at', self.state_id)
             self.send_cmd(message)
-            ans = self.get_answer()
+            ans = self.parser.nextAnswer()
             self.remove_answer(ans, "undo")
 
     def interupt(self):
@@ -244,7 +247,7 @@ class CoqTop:
         a = API()
         message = a.get_call_msg('StopWorker', "0")
         self.send_cmd(message)
-        self.get_answer()
+        self.parser.nextAnswer()
 
     def silent_interupt(self):
         self.messenger.interupt()
@@ -262,45 +265,12 @@ class CoqTop:
             self.coqtop.stdin.write(msg)
             self.coqtop.stdin.flush()
 
-    def recv_answer(self):
-        if self.coqtop is None:
-            return
-        fd = self.coqtop.stdout.fileno()
-        data = b''
-        a = API()
-        shouldWait = True
-        elt = None
-        while shouldWait:
-            try:
-                time.sleep(0.001)
-                if self.interupted:
-                    self.interupted = False
-                    return None
-                data += os.read(fd, 0x400000)
-                try:
-                    elt = ET.fromstring('<coqtoproot>' + escape(data) + '</coqtoproot>')
-                    shouldWait = a.response_end(elt)
-                except ET.ParseError:
-                    continue
-            except OSError:
-                return None
-        self.printer.debug("<<<" + str(data) + "\n")
-        return elt
-
-    def get_answer(self):
-        a = API()
-        elt = self.recv_answer()
-        return a.parse_response(elt)
-
     def remove_answer(self, r, msgtype):
         self.printer.parseMessage(r, msgtype)
         if isinstance(r, Err) and msgtype == 'addgoal':
             self.rewind()
             return
-        if not hasattr(r, 'val'):
-            return
-        for c in list(r.val):
-            if isinstance(c, StateId):
-                self.states.append(self.state_id)
-                self.state_id = c
-                break
+        if isinstance(r, Ok) and not r.state_id is None:
+            self.states.append(self.state_id)
+            self.state_id = r.state_id
+

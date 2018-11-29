@@ -4,7 +4,7 @@ from .coqtop import CoqTop, Version
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
-from threading import Lock, RLock, Thread
+from threading import Lock, Thread
 
 import os
 import re
@@ -368,6 +368,7 @@ class Actionner(Thread):
         self.vim = vim
         self.buf = self.vim.current.buffer
 
+        self.info = []
         self.must_stop = False
         self.running_lock = Lock()
         self.valid_dots = []
@@ -580,24 +581,17 @@ class Actionner(Thread):
         #    self.hl_error_command_src = None
 
     def parseMessage(self, msg, msgtype):
+        self.debug("Parsing message: " + str(msg) + " of type " + str(msgtype))
         if isinstance(msg, Ok):
             if msgtype == "addgoal":
-                self.vim.async_call(regoal, self, msg.val)
                 with self.running_lock:
                     if self.running_dots != []:
                         dot = self.running_dots.pop()
                         self.valid_dots.append(dot)
                 self.vim.async_call(goto_last_dot, self)
                 self.ask_redraw()
-                self.vim.async_call(reinfo, self, msg.msg)
-            if msgtype == "goal":
-                self.vim.async_call(regoal, self, msg.val)
-            if msgtype == "query":
-                self.vim.async_call(reinfo, self, msg.msg)
         elif msgtype == "goal":
             pass
-        elif msgtype == "query":
-            self.vim.async_call(reinfo, self, msg.err)
         else:
             if isinstance(msg, Err):
                 with self.running_lock:
@@ -605,6 +599,17 @@ class Actionner(Thread):
                     self.vim.async_call(reerror, self, self.running_dots.pop(), msg.loc_s, msg.loc_e)
                     self.ct.silent_interupt()
                     self.running_dots = []
+
+    def addInfo(self, info):
+        self.info.append(info)
+        self.vim.async_call(reinfo, self, self.info)
+
+    def flushInfo(self):
+        self.vim.async_call(reinfo, self, self.info)
+        self.info = []
+
+    def addGoal(self, goals):
+        self.vim.async_call(regoal, self, goals)
 
     def showError(self, pos, start, end):
         """Show error by highlighting the area. POS is the position of the next dot,
@@ -655,6 +660,8 @@ the previous dot."""
             self.buf.add_highlight("CoqError", eline, 0, ecol, src_id=self.hl_error_src)
 
     def showInfo(self, info):
+        if not hasattr(self, 'info_buf'):
+            return
         buf = self.find_buf(self.info_buf)
         del buf[:]
         if isinstance(info, list):
@@ -681,35 +688,18 @@ the previous dot."""
         for l in lst:
             buf.append(l)
 
-    def focused(self, goals):
-        if goals == []:
-            return 0
-        if isinstance(goals, Goal):
-            return 1
-        s = 0
-        for g in goals:
-            s += self.focused(g)
-        return s
-
-    def showGoal(self, goal):
+    def showGoal(self, goals):
+        if not hasattr(self, 'goal_buf'):
+            return
         buf = self.find_buf(self.goal_buf)
         blines = []
-        if goal is None:
-            del buf[:]
-            return
-        if (not hasattr(goal, 'val')) and (isinstance(goal, tuple) or isinstance(goal, list)):
-            for g in goal:
-                return self.showGoal(g)
-            return
-        if goal.val is None:
+        if goals is None:
             blines.append('No goals.')
         else:
-            goals = goal.val
             sub_goals = goals.fg
-            unfocused_goals = goals.bg
-
-            nb_unfocused = self.focused(unfocused_goals)
+            nb_unfocused = goals.bg
             nb_subgoals = len(sub_goals)
+
             plural_opt = '' if nb_subgoals == 1 else 's'
             blines.append('%d subgoal%s (%d unfocused)' % (nb_subgoals, plural_opt, nb_unfocused))
             blines.append('')
@@ -718,22 +708,9 @@ the previous dot."""
                 _id = sub_goal.id
                 hyps = sub_goal.hyp
                 ccl = sub_goal.ccl
-                if isinstance(ccl, RichPP):
-                    try:
-                        ccl.parts.remove(None)
-                    except:
-                        pass
-                    ccl = ''.join(ccl.parts)
                 if idx == 0:
                     # we print the environment only for the current subgoal
                     for hyp in hyps:
-                        if isinstance(hyp, RichPP):
-                            hyp = hyp.parts
-                            try:
-                                hyp.remove(None)
-                            except:
-                                pass
-                            hyp = ''.join(hyp)
                         lst = map(lambda s: s.encode('utf-8'), hyp.split('\n'))
                         for line in lst:
                             blines.append(line)

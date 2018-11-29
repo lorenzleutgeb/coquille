@@ -123,16 +123,17 @@ def parse_value(xml):
                 return [parse_value(c)]
 
 class Ok:
-    def __init__(self, value, messages):
-        self.val = value
-        self.msg = [parse_value(c) for c in messages]
+    def __init__(self, state_id):
+        if not state_id is None:
+            self.state_id = StateId(int(state_id))
+        else:
+            self.state_id = None
 
 class Err:
-    def __init__(self, error, messages, loc_s, loc_e):
+    def __init__(self, error, loc_s, loc_e):
         self.err = error
-        self.msg = [parse_value(c) for c in messages]
-        self.loc_s = int(loc_s) if loc_s != None else 0
-        self.loc_e = int(loc_e) if loc_e != None else 0
+        self.loc_s = loc_s
+        self.loc_e = loc_e
 
 class API:
     def __init__(self):
