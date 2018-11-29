@@ -18,8 +18,8 @@ def reinfo(obj, msg):
     obj.showInfo(msg)
 def regoal(obj, msg):
     obj.showGoal(msg)
-def reerror(obj, pos):
-    obj.showError(pos)
+def reerror(obj, pos, start, end):
+    obj.showError(pos, start, end)
 def step(obj):
     obj.next()
 def cursor(obj):
@@ -211,13 +211,13 @@ class Main(object):
         self.vim.command('echo "debug: '+str(actionner.flush_debug()).replace("\"", "\\\"")+'"')
 
     @neovim.function('CoqErrorAt', sync=True)
-    def showError(self, pos):
+    def showError(self, pos, start, end):
         name = self.vim.eval("w:coquille_running")
         if name == 'false':
             return
         actionner = self.actionners[name]
         self.diditdieyet()
-        actionner.showError(pos)
+        actionner.showError(pos, start, end)
 
     @neovim.function('CoqRedrawInfo', sync=True)
     def showInfo(self, info):
@@ -365,6 +365,7 @@ class Actionner(Thread):
         self.debug_wanted = False
         self.exception = Exception('No information')
         self.hl_error_src = None
+        self.hl_error_command_src = None
         self.hl_ok_src = None
         self.hl_progress_src = None
 
@@ -550,6 +551,9 @@ class Actionner(Thread):
         if self.hl_error_src != None:
             self.buf.clear_highlight(self.hl_error_src)
             self.hl_error_src = None
+        if self.hl_error_command_src != None:
+            self.buf.clear_highlight(self.hl_error_command_src)
+            self.hl_error_command_src = None
 
     def parseMessage(self, msg, msgtype):
         if isinstance(msg, Ok):
@@ -574,23 +578,46 @@ class Actionner(Thread):
             if isinstance(msg, Err):
                 with self.running_lock:
                     self.vim.async_call(reinfo, self, msg.err)
-                    self.vim.async_call(reerror, self, self.running_dots.pop())
+                    self.vim.async_call(reerror, self, self.running_dots.pop(), msg.loc_s, msg.loc_e)
                     self.ct.silent_interupt()
                     self.running_dots = []
 
-    def showError(self, pos):
+    def showError(self, pos, start, end):
         if self.valid_dots == []:
             (line, col) = (0, 0)
         else:
             (line, col) = self.valid_dots[-1]
         (eline, ecol) = pos
         self.error_shown = True
-        self.hl_error_src = self.vim.new_highlight_source()
-        self.buf.add_highlight("CoqError", line, col, ecol if line == eline else -1,
-                src_id=self.hl_error_src)
+        self.hl_error_command_src = self.vim.new_highlight_source()
+        self.buf.add_highlight("CoqErrorCommand", line, col, ecol if line == eline else -1,
+                src_id=self.hl_error_command_src)
         if self.hl_progress_src != None:
             self.buf.clear_highlight(self.hl_progress_src)
             self.hl_progress_src = None
+        for i in range(line+1, eline):
+            self.buf.add_highlight("CoqErrorCommand", i, 0, -1, src_id=self.hl_error_command_src)
+        if line != eline:
+            self.buf.add_highlight("CoqErrorCommand", eline, 0, ecol, src_id=self.hl_error_command_src)
+
+        self.hl_error_src = self.vim.new_highlight_source()
+        while len(self.buf[line]) - col < start:
+            diff = len(self.buf[line]) - col + 1
+            line = line+1
+            col = 0
+            start = start - diff
+            end = end - diff
+        ecol = col
+        col = start
+        eline = line
+        while len(self.buf[eline]) - ecol < end:
+            eline = eline+1
+            diff = len(self.buf[eline]) - ecol
+            ecol = 0
+            end = end - diff
+        ecol = end
+        self.buf.add_highlight("CoqError", line, col, ecol if line == eline else -1,
+                src_id=self.hl_error_src)
         for i in range(line+1, eline):
             self.buf.add_highlight("CoqError", i, 0, -1, src_id=self.hl_error_src)
         if line != eline:
@@ -698,6 +725,9 @@ class Actionner(Thread):
         if self.hl_error_src != None:
             self.buf.clear_highlight(self.hl_error_src)
             self.hl_error_src = None
+        if self.hl_error_command_src != None:
+            self.buf.clear_highlight(self.hl_error_command_src)
+            self.hl_error_command_src = None
         if self.valid_dots != []:
             (eline, ecol) = self.valid_dots[-1]
         else:

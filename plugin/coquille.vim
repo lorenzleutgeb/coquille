@@ -25,6 +25,7 @@ endfunction
 function! coquille#Register()
     hi default CheckedByCoq ctermbg=17 guibg=LightGreen
     hi default SentToCoq ctermbg=60 guibg=LimeGreen
+    hi default CoqErrorCommand ctermbg=226 ctermfg=black guibg=LimeGreen
     hi link CoqError Error
 endfunction
 

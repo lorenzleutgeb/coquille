@@ -129,9 +129,11 @@ class Ok:
         pass
 
 class Err:
-    def __init__(self, error, messages):
+    def __init__(self, error, messages, loc_s, loc_e):
         self.err = error
         self.msg = [parse_value(c) for c in messages]
+        self.loc_s = int(loc_s)
+        self.loc_e = int(loc_e)
         pass
 
 class API:
@@ -181,5 +183,5 @@ class API:
         if valueNode.get('val') == 'good':
             return Ok(parse_value(valueNode[0]), messageNodes)
         if valueNode.get('val') == 'fail':
-            return Err(parse_value(valueNode[1]), messageNodes)
+            return Err(parse_value(valueNode[1]), messageNodes, valueNode.get('loc_s'), valueNode.get('loc_e'))
         assert False, "Unexpected answer from coqtop: {}".format(ET.tostring(xml))
