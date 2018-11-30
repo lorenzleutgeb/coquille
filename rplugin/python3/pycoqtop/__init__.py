@@ -83,7 +83,6 @@ class Main(object):
         self.vim.call('coquille#KillSession')
         self.vim.command('bdelete '+str(self.info_wins[name]))
         self.vim.command('bdelete '+str(self.goal_wins[name]))
-        self.vim.command('echo "Wins: ' + str(self.goal_wins) + '"')
         self.vim.command("let w:coquille_running='false'")
         self.vim.command("au! * <buffer>")
         actionner.join()
@@ -105,7 +104,6 @@ class Main(object):
         name = self.vim.eval("w:coquille_running")
         if name == 'false':
             return
-        self.vim.command('echo "'+name+'"')
         actionner = self.actionners[name]
         self.diditdieyet()
         actionner.add_action('next')
