@@ -581,12 +581,18 @@ class Actionner(Thread):
                     self.running_dots = []
 
     def showError(self, pos, start, end):
+        """Show error by highlighting the area. POS is the position of the next dot,
+START is the begining of the actual error, in number of characters from the
+previous dot. END is the end of the actual error, in number of characters from
+the previous dot."""
         if self.valid_dots == []:
             (line, col) = (0, 0)
         else:
             (line, col) = self.valid_dots[-1]
         (eline, ecol) = pos
         self.error_shown = True
+
+        # Show the yellow background
         self.hl_error_command_src = self.vim.new_highlight_source()
         self.buf.add_highlight("CoqErrorCommand", line, col, ecol if line == eline else -1,
                 src_id=self.hl_error_command_src)
@@ -598,6 +604,7 @@ class Actionner(Thread):
         if line != eline:
             self.buf.add_highlight("CoqErrorCommand", eline, 0, ecol, src_id=self.hl_error_command_src)
 
+        # Show the red background
         self.hl_error_src = self.vim.new_highlight_source()
         while len(self.buf[line]) - col < start:
             diff = len(self.buf[line]) - col + 1
@@ -606,14 +613,14 @@ class Actionner(Thread):
             start = start - diff
             end = end - diff
         ecol = col
-        col = start
+        col = col + start
         eline = line
         while len(self.buf[eline]) - ecol < end:
             eline = eline+1
             diff = len(self.buf[eline]) - ecol
             ecol = 0
             end = end - diff
-        ecol = end
+        ecol = ecol + end
         self.buf.add_highlight("CoqError", line, col, ecol if line == eline else -1,
                 src_id=self.hl_error_src)
         for i in range(line+1, eline):
