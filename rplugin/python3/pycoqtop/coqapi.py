@@ -126,15 +126,13 @@ class Ok:
     def __init__(self, value, messages):
         self.val = value
         self.msg = [parse_value(c) for c in messages]
-        pass
 
 class Err:
     def __init__(self, error, messages, loc_s, loc_e):
         self.err = error
         self.msg = [parse_value(c) for c in messages]
-        self.loc_s = int(loc_s)
-        self.loc_e = int(loc_e)
-        pass
+        self.loc_s = int(loc_s) if loc_s != None else 0
+        self.loc_e = int(loc_e) if loc_e != None else 0
 
 class API:
     def __init__(self):
