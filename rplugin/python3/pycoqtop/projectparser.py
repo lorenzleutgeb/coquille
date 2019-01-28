@@ -1,12 +1,13 @@
 class ProjectParser():
     def __init__(self, filename):
-        self.R = [('.', '')]
+        self.R = []
         self.Q = []
         self.I = []
         self.coqtop = 'coqtop'
         self.variables = {}
 
         if filename == None:
+            self.R = [('.', '')]
             return
 
         lines = []
