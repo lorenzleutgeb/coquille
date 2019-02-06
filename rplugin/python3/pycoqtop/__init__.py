@@ -51,8 +51,13 @@ class Main(object):
             self.vim.command('echo "Coquille is already running in this window!"')
             return
         random_name = str(uuid.uuid4())
-        self.actionners[random_name] = Actionner(self.vim)
-        self.currentVersion = self.actionners[random_name].version(args)
+        try:
+            self.actionners[random_name] = Actionner(self.vim)
+            self.currentVersion = self.actionners[random_name].version(args)
+        except:
+            self.vim.command('echo "Coq could not be found!"')
+            return
+
         if not self.currentVersion.is_allowed():
             self.actionners[random_name].stop()
             self.actionners[random_name].join()
@@ -71,6 +76,18 @@ class Main(object):
         else:
             self.vim.command('echo "Coq could not be launched!"')
             self.vim.command("let w:coquille_running='false'")
+
+    @neovim.function('CoqVersion', sync=True)
+    def version(self, args=[]):
+        if self.vim.eval("w:coquille_running") != 'false':
+            self.vim.command('echo "Coq {}"'.format(self.currentVersion))
+        else:
+            try:
+                a = Actionner(self.vim)
+                version = a.version(args)
+                self.vim.command('echo "Coq {}"'.format(version))
+            except:
+                self.vim.command('echo "Coq could not be found!"')
 
     @neovim.function('CoqStop', sync=True)
     def stop(self, args=[]):
