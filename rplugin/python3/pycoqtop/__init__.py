@@ -494,8 +494,9 @@ class Actionner(Thread):
 
     def cancel(self, args=[]):
         with self.running_lock:
-            self.ct.interupt()
-            self.running_dots = []
+            if self.running_dots != []:
+                self.ct.interupt()
+                self.running_dots = []
         self.ask_redraw()
 
     def check(self, terms):
