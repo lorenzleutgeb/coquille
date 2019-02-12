@@ -3,7 +3,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import signal
 import time
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 
 from .coqapi import API, Ok, Err
 from .coqxml import CoqParser
@@ -31,11 +31,14 @@ class Messenger(Thread):
         self.messages = []
         self.lock = Lock()
         self.cont = True
+        self.waiting = False
+        self.interupted = False
+        self.silent_interupted = False
+        self.canInteruptHere = True
         self.exception = Exception('No information')
 
     def stop(self):
         self.cont = False
-        self.join()
 
     def add_message(self, msg):
         if not (self.isAlive()):
@@ -44,32 +47,64 @@ class Messenger(Thread):
         with self.lock:
             self.messages.insert(0, msg)
 
+    def silent_interupt(self):
+        with self.lock:
+            self.silent_interupted = True
+
     def interupt(self):
         with self.lock:
-            self.messages = []
+            self.interupted = True
     
     def is_empty(self):
         with self.lock:
             return self.messages == []
 
+    def guarded_interupt(self, mtype):
+        with self.lock:
+            if self.canInteruptHere and self.interupted and self.waiting:
+                self.coqtop.printer.debug("\nINTERRUPTED!!\n")
+                self.coqtop.coqtop.send_signal(signal.SIGINT)
+                self.messages = []
+                self.messages.insert(0, CoqGoal(self.coqtop))
+                self.interupted = False
+            elif self.canInteruptHere and self.interupted and not self.waiting:
+                self.messages = []
+                self.silent_interupted = False
+            elif self.canInteruptHere and self.silent_interupted:
+                self.messages = []
+                self.interupted = False
+
     def run(self):
         try:
             i = 0
             while self.cont:
+                mtype = None
+                sleep = True
+
                 with self.lock:
                     sleep = self.messages == []
                     if not sleep:
                         self.printer.debug(">< SENDING NEXT MESSAGE ><\n")
                         message = self.messages.pop()
-                        self.coqtop.send_cmd(message.get_string())
+                        mtype = message.type
+                        with self.coqtop.waiting_lock:
+                            if message.type == 'goal' or message.type == 'addgoal':
+                                self.canInteruptHere = True
+                                self.coqtop.parser.nextFlush = False
+                            else:
+                                self.canInteruptHere = False
+                            self.coqtop.send_cmd(message.get_string())
+                            self.coqtop.answer_event.clear()
                         self.printer.debug(">< NEXT MESSAGE SENT ><\n")
 
                 if sleep:
                     time.sleep(0.2)
                     continue
 
-                answer = self.coqtop.parser.nextAnswer()
-                self.coqtop.remove_answer(answer, message.type)
+                self.waiting = True
+                self.coqtop.wait_answer(mtype)
+                self.waiting = False
+                self.guarded_interupt(mtype)
             with self.lock:
                 self.messages = []
         except BaseException as e:
@@ -116,17 +151,25 @@ def ignore_sigint():
 class CoqTop:
     def __init__(self, printer, parser):
         self.write_lock = Lock()
-        self.interupted = False
+        self.waiting_lock = Lock()
+        self.answer_event = Event()
+        self.answer_event.clear()
         self.printer = printer
         self.coqtop = None
         self.states = []
         self.state_id = None
         self.root_state = None
         self.messenger = None
+        self.calltype = "init"
+        self.shouldRewind = False
         self.coqtopbin = parser.getCoqtop()
         self.I = parser.getI()
         self.Q = parser.getQ()
         self.R = parser.getR()
+        self.worker = 'master'
+
+    def setWorker(self, worker):
+        self.worker = worker
 
     def setPrinter(self, printer):
         self.printer = printer
@@ -165,8 +208,8 @@ class CoqTop:
                     stderr = subprocess.STDOUT)
             else:
                 self.coqtop = subprocess.Popen(options + list(args),
-                    stdin = subprocess.PIPE, stdout = subprocess.PIPE,
-                    preexec_fn = ignore_sigint)
+                    stdin = subprocess.PIPE, stdout = subprocess.PIPE)#,
+                    #preexec_fn = ignore_sigint)
             r = self.init()
             self.printer.debug("\n>< INIT DONE ><\n")
             assert isinstance(r, Ok)
@@ -186,17 +229,41 @@ class CoqTop:
             except OSError:
                 pass
             self.coqtop = None
+            self.printer.vim.command("echo 'Stoping messenger'")
             self.messenger.stop()
+            self.printer.vim.command("echo 'Stoping parser'")
             self.parser.stop()
+            self.printer.vim.command("echo 'Joining messenger'")
             self.messenger.join()
 
     def init(self):
         a = API()
         message = a.get_init_msg()
         self.send_cmd(message)
-        self.parser = CoqParser(self.coqtop, self.printer)
+        self.parser = CoqParser(self.coqtop, self, self.printer)
         self.parser.start()
-        return self.parser.nextAnswer()
+        return Ok(1)
+
+    def wait_answer(self, calltype):
+        self.calltype = calltype
+        while not self.answer_event.isSet():
+            self.answer_event.wait(0.1)
+            self.messenger.guarded_interupt(calltype)
+        if self.shouldRewind:
+            self.rewind()
+
+    def wait_answer_uninterrupted(self, calltype):
+        self.calltype = calltype
+        self.answer_event.wait()
+        if self.shouldRewind:
+            self.rewind()
+
+    def pull_event(self, event):
+        self.shouldRewind = self.remove_answer(event, self.calltype)
+        self.printer.debug("\nEnd of remove_answer\n")
+        self.calltype = None
+        with self.waiting_lock:
+            self.answer_event.set()
 
     def goals(self, advance = False):
         self.messenger.add_message(CoqGoal(self, advance))
@@ -237,20 +304,17 @@ class CoqTop:
             self.states = self.states[0:idx]
             a = API()
             message = a.get_call_msg('Edit_at', self.state_id)
-            self.send_cmd(message)
-            ans = self.parser.nextAnswer()
-            self.remove_answer(ans, "undo")
+            with self.waiting_lock:
+                self.send_cmd(message)
+                self.answer_event.clear()
+            self.wait_answer_uninterrupted("undo")
 
     def interupt(self):
         self.messenger.interupt()
-        self.interupted = True
         a = API()
-        message = a.get_call_msg('StopWorker', "0")
-        self.send_cmd(message)
-        self.parser.nextAnswer()
 
     def silent_interupt(self):
-        self.messenger.interupt()
+        self.messenger.silent_interupt()
 
     def send_async_cmd(self, msg):
         if self.coqtop is None:
@@ -268,9 +332,9 @@ class CoqTop:
     def remove_answer(self, r, msgtype):
         self.printer.parseMessage(r, msgtype)
         if isinstance(r, Err) and msgtype == 'addgoal':
-            self.rewind()
-            return
+            return True
         if isinstance(r, Ok) and not r.state_id is None:
             self.states.append(self.state_id)
             self.state_id = r.state_id
+        return False
 

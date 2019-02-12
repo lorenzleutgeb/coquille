@@ -371,8 +371,8 @@ class Actionner(Thread):
         self.info = []
         self.must_stop = False
         self.running_lock = Lock()
-        self.valid_dots = []
         self.running_dots = []
+        self.valid_dots = []
         self.actions = []
         self.redrawing = False
         self.redraw_asked = False
@@ -426,11 +426,14 @@ class Actionner(Thread):
         return m
 
     def ask_redraw(self):
+        quit = False
         with self.running_lock:
             if self.redrawing:
                 self.redraw_asked = True
-                return
+                quit = True
             self.redrawing = True
+        if quit:
+            return
         self.vim.async_call(recolor, self)
 
     def check_modification(self):
@@ -450,11 +453,11 @@ class Actionner(Thread):
         with self.running_lock:
             res = request(self.vim, FullstepRequester(self))
             step = res['step']
-            if step is None: return
-            message = res['message']
-            self.running_dots.insert(0, res['running'])
-            self.ct.advance(res['message'], encoding)
-            self.ct.goals(True)
+            if step is not None:
+                message = res['message']
+                self.running_dots.insert(0, res['running'])
+                self.ct.advance(res['message'], encoding)
+                self.ct.goals(True)
         self.ask_redraw()
 
     def undo(self, args = []):
@@ -469,8 +472,8 @@ class Actionner(Thread):
         if steps < 1 or self.valid_dots == []:
             return
 
+        self.ct.rewind(steps)
         with self.running_lock:
-            self.ct.rewind(steps)
             self.valid_dots = self.valid_dots[:len(self.valid_dots) - steps]
             self.ct.goals()
         if len(args) == 0:
@@ -505,7 +508,6 @@ class Actionner(Thread):
         with self.running_lock:
             if self.running_dots != []:
                 self.ct.interupt()
-                self.running_dots = []
         self.ask_redraw()
 
     def check(self, terms):
@@ -581,7 +583,6 @@ class Actionner(Thread):
         #    self.hl_error_command_src = None
 
     def parseMessage(self, msg, msgtype):
-        self.debug("Parsing message: " + str(msg) + " of type " + str(msgtype))
         if isinstance(msg, Ok):
             if msgtype == "addgoal":
                 with self.running_lock:
@@ -589,16 +590,20 @@ class Actionner(Thread):
                         dot = self.running_dots.pop()
                         self.valid_dots.append(dot)
                 self.vim.async_call(goto_last_dot, self)
-                self.ask_redraw()
+            self.ask_redraw()
         elif msgtype == "goal":
-            pass
+            with self.running_lock:
+                self.running_dots = []
+            self.ask_redraw()
         else:
             if isinstance(msg, Err):
                 with self.running_lock:
                     self.vim.async_call(reinfo, self, msg.err)
-                    self.vim.async_call(reerror, self, self.running_dots.pop(), msg.loc_s, msg.loc_e)
+                    if self.running_dots != []:
+                        self.vim.async_call(reerror, self, self.running_dots.pop(), msg.loc_s, msg.loc_e)
                     self.ct.silent_interupt()
                     self.running_dots = []
+                self.ask_redraw()
 
     def addInfo(self, info):
         self.info.append(info)
@@ -647,8 +652,8 @@ the previous dot."""
         col = col + start
         eline = line
         while len(self.buf[eline]) - ecol < end:
-            eline = eline+1
             diff = len(self.buf[eline]) - ecol
+            eline = eline+1
             ecol = 0
             end = end - diff
         ecol = ecol + end

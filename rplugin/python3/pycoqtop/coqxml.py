@@ -1,19 +1,20 @@
 import xml.etree.ElementTree as ET
 import time
+import select
 
 from io import StringIO
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from os import read
 from .coqapi import Ok, Err
 from .xmltype import *
 
 class CoqHandler:
-    def __init__(self, printer):
+    def __init__(self, state_manager, printer):
         self.printer = printer
+        self.state_manager = state_manager
         self.currentContent = ""
         self.currentProcess = None
         self.messageLevel = None
-        self.reply = None
         self.val = None
         self.state_id = None
         self.nextFlush = True
@@ -27,10 +28,6 @@ class CoqHandler:
         self.goal_id = None
         self.goal_hyps = []
         self.goal_ccl = None
-
-        self.event_read = Event()
-        self.event_cont = Event()
-        self.event_cont.set()
 
     # Call when an element starts
     def start(self, tag, attributes):
@@ -61,6 +58,8 @@ class CoqHandler:
             self.state_id = attributes['val']
         elif tag == 'feedback_content' and attributes['val'] == 'message':
             self.currentProcess = 'waitmessage'
+        elif tag == 'feedback_content' and attributes['val'] == 'processingin':
+            self.currentProcess = 'waitworker'
         elif self.currentProcess == 'message' and tag == 'message_level':
             self.messageLevel = attributes['val']
         elif tag == 'message' and self.currentProcess == 'waitmessage':
@@ -69,18 +68,18 @@ class CoqHandler:
     # Call when an element ends
     def end(self, tag):
         if tag == "value":
+            if self.nextFlush:
+                self.printer.flushInfo()
+            self.nextFlush = True
             if self.val == 'good':
-                self.reply = Ok(self.state_id)
+                self.state_manager.pull_event(Ok(self.state_id))
             else:
-                self.reply = Err(None, False if not hasattr(self, "loc_s") else int(self.loc_s), False if not hasattr(self, "loc_e") else int(self.loc_e))
+                self.state_manager.pull_event(
+                        Err(None, False if not hasattr(self, "loc_s") or self.loc_s is None else int(self.loc_s),
+                            False if not hasattr(self, "loc_e") or self.loc_e is None else int(self.loc_e)))
                 self.printer.addInfo(self.currentContent)
                 self.currentContent = ''
                 self.nextFlush = False
-            self.printer.debug("Process returned: " + str(self.reply))
-            self.event_cont.clear()
-            self.event_read.set()
-            self.event_cont.wait()
-            self.printer.debug("Continuing to parse things...\n")
             self.state_id = None
             self.val = None
             self.currentProcess = None
@@ -110,37 +109,31 @@ class CoqHandler:
         elif tag == 'list' and self.currentProcess == 'goals_shelved':
             self.currentProcess = 'goals_given_up'
         elif tag == 'feedback_content' and self.currentProcess == 'waitmessage':
-            self.printer.debug(self.messageLevel + ": " + self.currentContent)
+            self.printer.debug(self.messageLevel + ": " + str(self.currentContent) + "\n\n")
             self.printer.addInfo(self.currentContent)
             self.currentProcess = None
             self.messageLevel = None
+            self.currentContent = ''
+        elif tag == 'feedback_content' and self.currentProcess == 'waitworker':
+            self.state_manager.setWorker(self.currentContent)
             self.currentContent = ''
         elif tag == 'message' and self.currentProcess == 'message':
             self.currentProcess = 'waitmessage'
      
     # Call when a character is read
     def data(self, content):
-        if self.currentProcess == 'message' or self.currentProcess == 'value' or self.currentProcess == 'goal_id' or self.currentProcess == 'goal':
+        if self.currentProcess == 'message' or self.currentProcess == 'value' or \
+                self.currentProcess == 'goal_id' or self.currentProcess == 'goal' or \
+                self.currentProcess == 'waitworker':
             self.currentContent += content
 
-    def nextAnswer(self):
-        self.event_read.wait(2)
-        self.event_read.clear()
-        r = self.reply
-        self.reply = None
-        if self.nextFlush:
-            self.printer.flushInfo()
-        self.nextFlush = True
-        self.event_cont.set()
-        return r
-
 class CoqParser(Thread):
-    def __init__(self, process, printer):
+    def __init__(self, process, state_manager, printer):
         Thread.__init__(self)
         self.cont = True
         self.process = process
         self.printer = printer
-        self.target = CoqHandler(printer)
+        self.target = CoqHandler(state_manager, printer)
         self.parser = ET.XMLParser(target=self.target)
         self.parser.feed("""
 <!DOCTYPE coq [
@@ -153,29 +146,25 @@ class CoqParser(Thread):
         """)
 
     def run(self):
+        self.printer.debug("Running parser...\n")
         try:
+            f = self.process.stdout
             while self.cont:
-                r = read(self.process.stdout.fileno(), 0x400)
-                self.printer.debug("<< " + str(r) + "\n")
-                if r == b'':
-                    time.sleep(1)
-                else:
-                    self.parser.feed(r)
+                r, w, e = select.select([ f ], [], [], 0.1)
+                if f in r:
+                    content = read(f.fileno(), 0x400)
+                    self.printer.debug("<< " + str(content) + "\n")
+                    self.parser.feed(content)
         except Exception as e:
             self.printer.debug("WHOOPS!\n")
-            self.printer.debug("WHOOPS! " + str(e))
+            self.printer.debug("WHOOPS! " + str(e) + "\n")
+            self.printer.debug("WHOOPS! " + str(traceback.format_exc()) + "\n")
         try:
             self.parser.feed("</Root>")
         except:
             pass
         self.printer.debug("END OF PARSING\n")
 
-    def nextAnswer(self):
-        if not self.isAlive():
-            self.printer.debug("DEAD :/\n")
-            return None
-        return self.target.nextAnswer()
-    
     def stop(self):
         self.cont = False
         self.join()
