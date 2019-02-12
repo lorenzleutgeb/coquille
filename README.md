@@ -6,29 +6,20 @@ favorite editor.
 
 This repository contains a port of coquille to neovim, with full asynchronous
 support, and to the latest coq version. Currently supported versions are 8.6,
-8.7 and 8.8. We will keep support for older versions and add support for newer
-versions as they are released.
+8.7, 8.8 and 8.9. We will keep support for older versions and add support for
+newer versions as they are released.
 
 Installation
 ------------
 
-This repository is meant to be used as a [pathogen][1] bundle. If you don't
-already use pathogen, I strongly recommend that you start right now.
-
-Installing Coquille is just as simple as doing:
-
-    cd ~/.config/nvim/bundle
-    git clone https://framagit.org/tyreunom/coquille.git
-
-Note that by default, coquille ships Vincent Aravantinos [syntax][2] and
-[indent][3] scripts for Coq, as well as an ftdetect script. If you already have
-those in your neovim config, then just switch to the master branch.
-
-It is possible to use Coquille without pathogen. After all, neovim is able to
-manage plugins by itself as long as you tell it where to look. Without pathogen,
-you can add this line to your `~/.config/nvim/init.vim`:
+It is possible to use Coquille without a plugin manager. After all, neovim is
+able to manage plugins by itself as long as you tell it where to look. Without
+a plugin manager, you can add this line to your `~/.config/nvim/init.vim`:
 
     set runtimepath+=~/.config/nvim/bundle/coquille
+
+The original coquille was meant to be run with pathogen.  If you use pathogen
+for any reason, you can still use it with this plugin.
 
 Getting started
 ---------------
@@ -68,6 +59,10 @@ to your `init.vim`.
 
 Alternatively you can, of course, define your own.
 
+You can also run multiple coq sessions in parallel on separate buffers of the
+same vim session, for instance if you use tabs; simply run `CoqLaunch` again in
+your other buffers.
+
 Running query commands
 ----------------------
 
@@ -95,7 +90,7 @@ Note that the color of the "lock zone" is hard coded and might not be pretty in
 your specific setup (depending on your terminal, colorscheme, etc).
 To change it, you can overwrite the `CheckedByCoq` and `SentToCoq` highlight
 groups (`:h hi` and `:h highlight-groups`) to colors that works better for you.
-See [coquille.vim][4] for an example.
+See [coquille.vim][1] for an example.
 
 For instance, you can put this in your ~/.config/nvim/init.vim:
 
@@ -152,7 +147,4 @@ directory and run:
 py.test
 ```
 
-[1]: https://github.com/tpope/vim-pathogen
-[2]: http://www.vim.org/scripts/script.php?script_id=2063 "coq syntax on vim.org"
-[3]: http://www.vim.org/scripts/script.php?script_id=2079 "coq indent on vim.org"
-[4]: https://github.com/the-lambda-church/coquille/blob/master/autoload/coquille.vim#L103
+[1]: https://framagit.org/tyreunom/coquille/blob/master/autoload/coquille.vim
