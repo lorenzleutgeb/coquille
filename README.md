@@ -135,7 +135,7 @@ Because pictures are always the best sellers:
 
 And videos are even better:
 
-[![asciicast](https://asciinema.org/a/MIhWjjrKrhAciiIqhaaVpGnfk.png?theme=solarized-dark)](https://asciinema.org/a/MIhWjjrKrhAciiIqhaaVpGnfk?theme=solarized-dark)
+[![asciicast](https://asciinema.org/a/ndLDbrpylgAviwIchV3twPmd7.svg)](https://asciinema.org/a/ndLDbrpylgAviwIchV3twPmd7)
 
 Testing
 -------
