@@ -4,7 +4,7 @@ from .coqtop import CoqTop, Version
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
 
 import os
 import re
@@ -265,15 +265,15 @@ def run_request(requester):
 class Requester:
     def __init__(self):
         self.result = None
-        self.haveResult = False
+        self.waiter = Event()
+        self.waiter.clear()
 
     def setResult(self, result):
         self.result = result
-        self.haveResult = True
+        self.waiter.set()
 
     def waitResult(self):
-        while not self.haveResult:
-            time.sleep(0.001)
+        self.waiter.wait()
         return self.result
 
 class StepRequester(Requester):
@@ -357,6 +357,65 @@ class LineRequester(Requester):
     def request(self):
         self.setResult(self.buf[self.line])
 
+class GoalRequester(Requester):
+    def __init__(self, printer, goals):
+        Requester.__init__(self)
+        self.printer = printer
+        self.goals = goals
+
+    def request(self):
+        self.printer.showGoal(self.goals)
+        self.setResult(0)
+
+class InfoRequester(Requester):
+    def __init__(self, printer, info):
+        Requester.__init__(self)
+        self.printer = printer
+        self.info = info
+
+    def request(self):
+        self.printer.showInfo(self.info)
+        self.setResult(0)
+
+class Printer(Thread):
+    def __init__(self, printer):
+        Thread.__init__(self)
+
+        self.printer = printer
+        self.info = []
+        self.goal = []
+        self.event = Event()
+        self.event.clear()
+        self.cont = True
+        self.lock = Lock()
+
+    def addGoal(self, goal):
+        with self.lock:
+            self.goal.append(goal);
+            self.event.set()
+
+    def addInfo(self, info):
+        with self.lock:
+            self.info.append(info);
+            self.event.set()
+
+    def flushInfo(self):
+        with self.lock:
+            self.info = []
+
+    def stop(self):
+        self.cont = False
+
+    def run(self):
+        while self.cont:
+            self.event.wait(0.1)
+            with self.lock:
+                self.event.clear()
+                if self.info != []:
+                    request(self.printer.vim, InfoRequester(self.printer, self.info))
+                if self.goal != []:
+                    request(self.printer.vim, GoalRequester(self.printer, self.goal.pop()))
+
 class Actionner(Thread):
     def __init__(self, vim):
         Thread.__init__(self)
@@ -367,6 +426,8 @@ class Actionner(Thread):
         self.coqtopbin = parser.getCoqtop()
         self.vim = vim
         self.buf = self.vim.current.buffer
+        self.printer = Printer(self)
+        self.printer.start()
 
         self.info = []
         self.must_stop = False
@@ -399,6 +460,8 @@ class Actionner(Thread):
     def stop(self):
         self.must_stop = True
         self.ct.kill()
+        self.printer.stop()
+        self.printer.join()
 
     def debug(self, msg):
         if self.debug_wanted:
@@ -598,7 +661,8 @@ class Actionner(Thread):
         else:
             if isinstance(msg, Err):
                 with self.running_lock:
-                    self.vim.async_call(reinfo, self, msg.err)
+                    self.printer.flushInfo()
+                    self.printer.addInfo(msg.err)
                     if self.running_dots != []:
                         self.vim.async_call(reerror, self, self.running_dots.pop(), msg.loc_s, msg.loc_e)
                     self.ct.silent_interupt()
@@ -606,15 +670,13 @@ class Actionner(Thread):
                 self.ask_redraw()
 
     def addInfo(self, info):
-        self.info.append(info)
-        self.vim.async_call(reinfo, self, self.info)
+        self.printer.addInfo(info)
 
     def flushInfo(self):
-        self.vim.async_call(reinfo, self, self.info)
-        self.info = []
+        self.printer.flushInfo()
 
     def addGoal(self, goals):
-        self.vim.async_call(regoal, self, goals)
+        self.printer.addGoal(goals)
 
     def showError(self, pos, start, end):
         """Show error by highlighting the area. POS is the position of the next dot,
@@ -669,6 +731,7 @@ the previous dot."""
             return
         buf = self.find_buf(self.info_buf)
         del buf[:]
+        self.debug("Print info: " + str(info) + "\n")
         if isinstance(info, list):
             for i in info:
                 self.showOneInfo(buf, i)
