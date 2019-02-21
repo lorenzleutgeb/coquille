@@ -14,8 +14,6 @@ import uuid
 
 def recolor(obj):
     obj.redraw()
-def reinfo(obj, msg):
-    obj.showInfo(msg)
 def regoal(obj, msg):
     obj.showGoal(msg)
 def reerror(obj, pos, start, end):

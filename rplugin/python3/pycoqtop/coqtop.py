@@ -43,7 +43,7 @@ class Messenger(Thread):
     def add_message(self, msg):
         if not (self.isAlive()):
             raise self.exception
-        self.printer.debug(">< ADDING MESSAGE ><\n")
+        self.printer.debug(">< ADDING MESSAGE " +str(msg)+ " ><\n")
         with self.lock:
             self.messages.insert(0, msg)
 
@@ -67,12 +67,14 @@ class Messenger(Thread):
                 self.messages = []
                 self.messages.insert(0, CoqGoal(self.coqtop))
                 self.interupted = False
-            elif self.canInteruptHere and self.interupted and not self.waiting:
-                self.messages = []
-                self.silent_interupted = False
-            elif self.canInteruptHere and self.silent_interupted:
+            elif self.canInteruptHere and self.interupted:
+                self.coqtop.printer.debug("\nINTERRUPTED 2!!\n")
                 self.messages = []
                 self.interupted = False
+            elif self.canInteruptHere and self.silent_interupted:
+                self.coqtop.printer.debug("\nINTERRUPTED 3!!\n")
+                self.messages = []
+                self.silent_interupted = False
 
     def run(self):
         try:
@@ -88,11 +90,12 @@ class Messenger(Thread):
                         message = self.messages.pop()
                         mtype = message.type
                         with self.coqtop.waiting_lock:
-                            if message.type == 'goal' or message.type == 'addgoal':
+                            if mtype == 'goal' or mtype == 'addgoal':
                                 self.canInteruptHere = True
                                 self.coqtop.parser.nextFlush = False
                             else:
                                 self.canInteruptHere = False
+                            self.coqtop.set_next_answer_type(mtype)
                             self.coqtop.send_cmd(message.get_string())
                             self.coqtop.answer_event.clear()
                         self.printer.debug(">< NEXT MESSAGE SENT ><\n")
@@ -102,9 +105,10 @@ class Messenger(Thread):
                     continue
 
                 self.waiting = True
-                self.coqtop.wait_answer(mtype)
+                self.coqtop.wait_answer()
                 self.waiting = False
                 self.guarded_interupt(mtype)
+
             with self.lock:
                 self.messages = []
         except BaseException as e:
@@ -244,16 +248,17 @@ class CoqTop:
         self.parser.start()
         return Ok(1)
 
-    def wait_answer(self, calltype):
+    def set_next_answer_type(self, calltype):
         self.calltype = calltype
+
+    def wait_answer(self):
         while not self.answer_event.isSet():
             self.answer_event.wait(0.1)
-            self.messenger.guarded_interupt(calltype)
+            self.messenger.guarded_interupt(self.calltype)
         if self.shouldRewind:
             self.rewind()
 
-    def wait_answer_uninterrupted(self, calltype):
-        self.calltype = calltype
+    def wait_answer_uninterrupted(self):
         self.answer_event.wait()
         if self.shouldRewind:
             self.rewind()
@@ -305,9 +310,10 @@ class CoqTop:
             a = API()
             message = a.get_call_msg('Edit_at', self.state_id)
             with self.waiting_lock:
+                self.set_next_answer_type("undo")
                 self.send_cmd(message)
                 self.answer_event.clear()
-            self.wait_answer_uninterrupted("undo")
+            self.wait_answer_uninterrupted()
 
     def interupt(self):
         self.messenger.interupt()
