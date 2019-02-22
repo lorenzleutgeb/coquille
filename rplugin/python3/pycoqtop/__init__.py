@@ -386,33 +386,45 @@ class Printer(Thread):
         self.event.clear()
         self.cont = True
         self.lock = Lock()
+        self.modified = False
 
     def addGoal(self, goal):
         with self.lock:
             self.goal.append(goal);
+            self.modified = True
             self.event.set()
 
     def addInfo(self, info):
+        self.printer.debug("Add Info: " + str(info) + "\n")
         with self.lock:
             self.info.append(info);
+            self.modified = True
             self.event.set()
+            self.printer.debug("Now: " + str(self.info) + "\n")
 
     def flushInfo(self):
         with self.lock:
+            self.printer.debug("Flushing\n")
             self.info = []
 
     def stop(self):
         self.cont = False
 
     def run(self):
-        while self.cont:
-            self.event.wait(0.1)
-            with self.lock:
-                self.event.clear()
-                if self.info != []:
-                    request(self.printer.vim, InfoRequester(self.printer, self.info))
-                if self.goal != []:
-                    request(self.printer.vim, GoalRequester(self.printer, self.goal.pop()))
+        try:
+            while self.cont:
+                self.event.wait(1)
+                with self.lock:
+                    self.event.clear()
+                    self.printer.debug("Info: " + str(self.info) + "\n")
+                    if self.modified and self.info != []:
+                        request(self.printer.vim, InfoRequester(self.printer, self.info))
+                        self.modified = False
+                    if self.modified and self.goal != []:
+                        request(self.printer.vim, GoalRequester(self.printer, self.goal.pop()))
+                        self.modified = False
+        except e:
+            self.printer.debug(str(e))
 
 class Actionner(Thread):
     def __init__(self, vim):
