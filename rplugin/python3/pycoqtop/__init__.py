@@ -387,6 +387,7 @@ class Printer(Thread):
         self.cont = True
         self.lock = Lock()
         self.modified = False
+        self.flushing = True
 
     def addGoal(self, goal):
         with self.lock:
@@ -395,17 +396,17 @@ class Printer(Thread):
             self.event.set()
 
     def addInfo(self, info):
-        self.printer.debug("Add Info: " + str(info) + "\n")
         with self.lock:
             self.info.append(info);
             self.modified = True
             self.event.set()
-            self.printer.debug("Now: " + str(self.info) + "\n")
 
     def flushInfo(self):
         with self.lock:
-            self.printer.debug("Flushing\n")
-            self.info = []
+            if self.modified:
+                self.flushing = True
+            else:
+                self.info = []
 
     def stop(self):
         self.cont = False
@@ -416,13 +417,14 @@ class Printer(Thread):
                 self.event.wait(1)
                 with self.lock:
                     self.event.clear()
-                    self.printer.debug("Info: " + str(self.info) + "\n")
                     if self.modified and self.info != []:
                         request(self.printer.vim, InfoRequester(self.printer, self.info))
                         self.modified = False
                     if self.modified and self.goal != []:
                         request(self.printer.vim, GoalRequester(self.printer, self.goal.pop()))
                         self.modified = False
+                    if self.flushing:
+                        self.info = []
         except e:
             self.printer.debug(str(e))
 
