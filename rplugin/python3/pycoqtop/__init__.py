@@ -414,7 +414,7 @@ class Printer(Thread):
     def run(self):
         try:
             while self.cont:
-                self.event.wait(1)
+                self.event.wait(0.1)
                 with self.lock:
                     self.event.clear()
                     if self.modified and self.info != []:
