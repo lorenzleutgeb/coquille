@@ -84,6 +84,7 @@ class CoqHandler:
             self.val = None
             self.currentProcess = None
         elif tag == 'goals':
+            self.printer.debug("Goals: " + str(self.goals_fg) + "\n;; " + str(self.goals_bg) + "\n;; " + str(self.goals_shelved) + "\n;; " + str(self.goals_given_up) + "\n")
             self.printer.addGoal(Goals(self.goals_fg, self.goals_bg, self.goals_shelved, self.goals_given_up))
             self.goals_fg = []
             self.goals_bg = 0
@@ -95,11 +96,14 @@ class CoqHandler:
             self.currentProcess = 'goal'
             self.currentContent = ''
         elif tag == 'list' and self.currentProcess == 'goal_hyps':
-            self.goal_hyps = [] # TODO
             self.currentContent = ''
             self.currentProcess = 'goal'
+        elif tag == 'richpp' and self.currentProcess == 'goal_hyps':
+            self.goal_hyps.append(self.currentContent)
+            self.currentContent = ''
         elif tag == 'goal' and self.currentProcess == 'goal':
             self.goals_fg.append(Goal(self.goal_id, self.goal_hyps, self.currentContent))
+            self.goal_hyps = []
             self.currentContent = ''
             self.currentProcess = 'fg'
         elif tag == 'list' and self.currentProcess == 'goals_fg':
@@ -124,7 +128,7 @@ class CoqHandler:
     def data(self, content):
         if self.currentProcess == 'message' or self.currentProcess == 'value' or \
                 self.currentProcess == 'goal_id' or self.currentProcess == 'goal' or \
-                self.currentProcess == 'waitworker':
+                self.currentProcess == 'waitworker' or self.currentProcess == 'goal_hyps':
             self.currentContent += content
 
 class CoqParser(Thread):
