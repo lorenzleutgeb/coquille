@@ -44,10 +44,14 @@ class CoqHandler:
             self.currentProcess = 'fg'
         elif tag == 'goal' and self.currentProcess == 'fg':
             self.currentProcess = 'goal'
-        elif tag == 'goal' and self.currentProcess == 'goals_bg':
+        elif tag == 'pair' and self.currentProcess == 'goals_bg':
+            self.currentProcess = 'goals_bg_in'
+        elif tag == 'goal' and self.currentProcess == 'goals_bg_in':
             self.goals_bg += 1
+        # TODO
         elif tag == 'goal' and self.currentProcess == 'goals_shelved':
             self.goals_shelved += 1
+        # TODO
         elif tag == 'goal' and self.currentProcess == 'goals_given_up':
             self.goals_given_up += 1
         elif tag == 'string' and self.currentProcess == 'goal':
@@ -95,23 +99,23 @@ class CoqHandler:
             self.goal_id = self.currentContent
             self.currentProcess = 'goal'
             self.currentContent = ''
-        elif tag == 'list' and self.currentProcess == 'goal_hyps':
-            self.currentContent = ''
-            self.currentProcess = 'goal'
-        elif tag == 'richpp' and self.currentProcess == 'goal_hyps':
-            self.goal_hyps.append(self.currentContent)
-            self.currentContent = ''
         elif tag == 'goal' and self.currentProcess == 'goal':
             self.goals_fg.append(Goal(self.goal_id, self.goal_hyps, self.currentContent))
             self.goal_hyps = []
             self.currentContent = ''
             self.currentProcess = 'fg'
-        elif tag == 'list' and self.currentProcess == 'goals_fg':
+        elif tag == 'richpp' and self.currentProcess == 'goal_hyps':
+            self.goal_hyps.append(self.currentContent)
+            self.currentContent = ''
+        elif tag == 'list' and self.currentProcess == 'goal_hyps':
+            self.currentContent = ''
+            self.currentProcess = 'goal'
+        elif tag == 'list' and self.currentProcess == 'fg':
+            self.currentContent = ''
             self.currentProcess = 'goals_bg'
-        elif tag == 'list' and self.currentProcess == 'goals_bg':
-            self.currentProcess = 'goals_shelved'
-        elif tag == 'list' and self.currentProcess == 'goals_shelved':
-            self.currentProcess = 'goals_given_up'
+        elif tag == 'pair' and self.currentProcess == 'goals_bg_in':
+            self.currentContent = ''
+            self.currentProcess = 'goals_bg'
         elif tag == 'feedback_content' and self.currentProcess == 'waitmessage':
             self.printer.debug(self.messageLevel + ": " + str(self.currentContent) + "\n\n")
             self.printer.addInfo(self.currentContent)
