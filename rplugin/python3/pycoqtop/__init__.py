@@ -375,6 +375,15 @@ class InfoRequester(Requester):
         self.printer.showInfo(self.info)
         self.setResult(0)
 
+class RemoveInfoRequester(Requester):
+    def __init__(self, printer):
+        Requester.__init__(self)
+        self.printer = printer
+
+    def request(self):
+        self.printer.removeInfo()
+        self.setResult(0)
+
 class Printer(Thread):
     def __init__(self, printer):
         Thread.__init__(self)
@@ -386,26 +395,31 @@ class Printer(Thread):
         self.event.clear()
         self.cont = True
         self.lock = Lock()
-        self.modified = False
-        self.flushing = True
+        self.info_modified = False
+        self.goal_modified = False
+        self.flushing = False
 
     def addGoal(self, goal):
         with self.lock:
             self.goal.append(goal);
-            self.modified = True
+            self.goal_modified = True
             self.event.set()
 
     def addInfo(self, info):
         with self.lock:
+            if self.flushing:
+                request(self.printer.vim, RemoveInfoRequester(self.printer))
+                self.flushing = False
+                self.info = []
             self.info.append(info);
-            self.modified = True
+            self.info_modified = True
             self.event.set()
 
     def flushInfo(self):
         with self.lock:
-            if self.modified:
-                self.flushing = True
-            else:
+            self.printer.debug("Flushing\n")
+            self.flushing = True
+            if not self.info_modified:
                 self.info = []
 
     def stop(self):
@@ -417,14 +431,16 @@ class Printer(Thread):
                 self.event.wait(0.1)
                 with self.lock:
                     self.event.clear()
-                    if self.modified and self.info != []:
+                    canFlush = False
+                    if self.info_modified and self.info != []:
                         request(self.printer.vim, InfoRequester(self.printer, self.info))
-                        self.modified = False
-                    if self.modified and self.goal != []:
-                        request(self.printer.vim, GoalRequester(self.printer, self.goal.pop()))
-                        self.modified = False
-                    if self.flushing:
                         self.info = []
+                        self.info_modified = False
+                        if self.flushing:
+                            canFlush = True
+                    if self.goal_modified and self.goal != []:
+                        request(self.printer.vim, GoalRequester(self.printer, self.goal.pop()))
+                        self.goal_modified = False
         except e:
             self.printer.debug(str(e))
 
@@ -738,11 +754,16 @@ the previous dot."""
         if line != eline:
             self.buf.add_highlight("CoqError", eline, 0, ecol, src_id=self.hl_error_src)
 
-    def showInfo(self, info):
+    def removeInfo(self):
         if not hasattr(self, 'info_buf'):
             return
         buf = self.find_buf(self.info_buf)
         del buf[:]
+
+    def showInfo(self, info):
+        if not hasattr(self, 'info_buf'):
+            return
+        buf = self.find_buf(self.info_buf)
         self.debug("Print info: " + str(info) + "\n")
         if isinstance(info, list):
             for i in info:
