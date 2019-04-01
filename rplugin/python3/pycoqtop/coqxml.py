@@ -13,6 +13,7 @@ class CoqHandler:
         self.printer = printer
         self.state_manager = state_manager
         self.currentContent = ""
+        self.oldProcess = None
         self.currentProcess = None
         self.messageLevel = None
         self.val = None
@@ -66,7 +67,12 @@ class CoqHandler:
             self.currentProcess = 'waitworker'
         elif self.currentProcess == 'message' and tag == 'message_level':
             self.messageLevel = attributes['val']
-        elif tag == 'message' and self.currentProcess == 'waitmessage':
+        elif tag == 'message':
+            # older coq (8.6) use a message tag at top-level, newer ones use a
+            # message tag inside a feedback_content one.
+            # Since there might be more than one message, we want to track when
+            # we came from a 'waitmessage' (newer coq).
+            self.oldProcess = self.currentProcess
             self.currentProcess = 'message'
 
     # Call when an element ends
@@ -117,9 +123,8 @@ class CoqHandler:
             self.currentContent = ''
             self.currentProcess = 'goals_bg'
         elif tag == 'feedback_content' and self.currentProcess == 'waitmessage':
-            self.printer.debug(self.messageLevel + ": " + str(self.currentContent) + "\n\n")
-            self.printer.addInfo(self.currentContent)
             self.currentProcess = None
+            self.oldProcess = None
             self.messageLevel = None
             self.currentContent = ''
         elif tag == 'feedback_content' and self.currentProcess == 'waitworker':
@@ -127,6 +132,11 @@ class CoqHandler:
             self.currentContent = ''
         elif tag == 'message' and self.currentProcess == 'message':
             self.currentProcess = 'waitmessage'
+            self.printer.debug(self.messageLevel + ": " + str(self.currentContent) + "\n\n")
+            self.printer.addInfo(self.currentContent)
+            self.currentProcess = self.oldProcess
+            self.messageLevel = None
+            self.currentContent = ''
      
     # Call when a character is read
     def data(self, content):
