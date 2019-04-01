@@ -9,10 +9,10 @@ don't plan to fill)
 Environment
 ===========
 
-Coq version (run `coqtop -v` if unsure): 
-Neovim version (run `nvim -v` if unsure): 
-I have run `:UpdateRemotePlugins` in neovim but it didn't help: 
-Branch (run `git branch` if unsure): 
+* Coq version (run `coqtop -v` if unsure): 
+* Neovim version (run `nvim -v` if unsure): 
+* I have run `:UpdateRemotePlugins` in neovim but it didn't help: 
+* Branch (run `git branch` if unsure): 
 
 Description
 ===========
