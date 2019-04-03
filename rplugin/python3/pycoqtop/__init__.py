@@ -660,18 +660,6 @@ class Actionner(Thread):
                 self.actions = self.actions[1:]
         except BaseException as e:
             self.exception = e
-        #if self.hl_ok_src != None:
-        #    self.buf.clear_highlight(self.hl_ok_src)
-        #    self.hl_ok_src = None
-        #if self.hl_progress_src != None:
-        #    self.buf.clear_highlight(self.hl_progress_src)
-        #    self.hl_progress_src = None
-        #if self.hl_error_src != None:
-        #    self.buf.clear_highlight(self.hl_error_src)
-        #    self.hl_error_src = None
-        #if self.hl_error_command_src != None:
-        #    self.buf.clear_highlight(self.hl_error_command_src)
-        #    self.hl_error_command_src = None
 
     def parseMessage(self, msg, msgtype):
         if isinstance(msg, Ok):
@@ -831,10 +819,10 @@ the previous dot."""
         self.hl_progress_src = None
 
         # Color again
-        if self.hl_error_src != None:
+        if self.hl_error_src != None and not self.error_shown:
             self.buf.clear_highlight(self.hl_error_src)
             self.hl_error_src = None
-        if self.hl_error_command_src != None:
+        if self.hl_error_command_src != None and not self.error_shown:
             self.buf.clear_highlight(self.hl_error_command_src)
             self.hl_error_command_src = None
         if self.valid_dots != []:
