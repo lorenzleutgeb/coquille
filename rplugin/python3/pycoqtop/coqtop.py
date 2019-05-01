@@ -152,6 +152,9 @@ class CoqGoal:
 def ignore_sigint():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+def new_coqtop(printer, parser):
+    return CoqTop(printer, parser)
+
 class CoqTop:
     def __init__(self, printer, parser):
         self.write_lock = Lock()

@@ -1,6 +1,6 @@
 import neovim
 
-from .coqtop import CoqTop, Version
+from .coqtop import new_coqtop, Version
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
@@ -450,7 +450,7 @@ class Actionner(Thread):
 
         coqproject = self.findCoqProject(os.getcwd())
         parser = ProjectParser(coqproject)
-        self.ct = CoqTop(self, parser)
+        self.ct = new_coqtop(self, parser)
         self.coqtopbin = parser.getCoqtop()
         self.vim = vim
         self.buf = self.vim.current.buffer
