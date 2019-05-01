@@ -147,6 +147,8 @@ def ignore_sigint():
 def new_coqtop(printer, parser):
     if parser.version().is86():
         return CoqTop86(printer, parser)
+    if parser.version().isatleast89():
+        return CoqTop89(printer, parser)
     return CoqTop(printer, parser)
 
 class CoqTop:
@@ -181,16 +183,19 @@ class CoqTop:
     def start(self):
         self.restart()
 
-    def restart(self, *args):
-        if self.coqtop:
-            self.kill()
-        self.messenger = Messenger(self)
-        options = [ self.coqtopbin, '-ideslave', '-main-channel', 'stdfds',
+    def getDefaultOptions(self):
+        return [ self.coqtopbin, '-ideslave', '-main-channel', 'stdfds',
             '-async-proofs', 'on',
             # prevent stupid behavior where "admit"s are added when errors
             # should occur. This "error resilience" non sense make coqc and
             # coqtop act differently, and the user wouldn't expect that.
             '-async-proofs-tactic-error-resilience', 'off']
+
+    def restart(self, *args):
+        if self.coqtop:
+            self.kill()
+        self.messenger = Messenger(self)
+        options = self.getDefaultOptions()
         for r in self.I:
             options.append('-I')
             options.append(r)
@@ -347,3 +352,12 @@ class CoqTop86(CoqTop):
 
     def query(self, terms):
         self.messenger.add_message(CoqQuery86(self, terms))
+
+class CoqTop89(CoqTop):
+    def __init__(self, printer, parser):
+        CoqTop.__init__(self, printer, parser)
+
+    def getDefaultOptions(self):
+        return [ self.coqtopbin, '-main-channel', 'stdfds',
+            '-async-proofs', 'on',
+            '-async-proofs-tactic-error-resilience', 'off']
