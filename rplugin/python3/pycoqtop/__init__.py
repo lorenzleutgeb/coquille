@@ -4,7 +4,7 @@ from .coqtop import CoqTop, Version
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
-from threading import Lock, RLock, Thread
+from threading import Event, Lock, Thread
 
 import os
 import re
@@ -14,8 +14,6 @@ import uuid
 
 def recolor(obj):
     obj.redraw()
-def reinfo(obj, msg):
-    obj.showInfo(msg)
 def regoal(obj, msg):
     obj.showGoal(msg)
 def reerror(obj, pos, start, end):
@@ -265,15 +263,15 @@ def run_request(requester):
 class Requester:
     def __init__(self):
         self.result = None
-        self.haveResult = False
+        self.waiter = Event()
+        self.waiter.clear()
 
     def setResult(self, result):
         self.result = result
-        self.haveResult = True
+        self.waiter.set()
 
     def waitResult(self):
-        while not self.haveResult:
-            time.sleep(0.001)
+        self.waiter.wait()
         return self.result
 
 class StepRequester(Requester):
@@ -357,6 +355,95 @@ class LineRequester(Requester):
     def request(self):
         self.setResult(self.buf[self.line])
 
+class GoalRequester(Requester):
+    def __init__(self, printer, goals):
+        Requester.__init__(self)
+        self.printer = printer
+        self.goals = goals
+
+    def request(self):
+        self.printer.showGoal(self.goals)
+        self.setResult(0)
+
+class InfoRequester(Requester):
+    def __init__(self, printer, info):
+        Requester.__init__(self)
+        self.printer = printer
+        self.info = info
+
+    def request(self):
+        self.printer.showInfo(self.info)
+        self.setResult(0)
+
+class RemoveInfoRequester(Requester):
+    def __init__(self, printer):
+        Requester.__init__(self)
+        self.printer = printer
+
+    def request(self):
+        self.printer.removeInfo()
+        self.setResult(0)
+
+class Printer(Thread):
+    def __init__(self, printer):
+        Thread.__init__(self)
+
+        self.printer = printer
+        self.info = []
+        self.goal = []
+        self.event = Event()
+        self.event.clear()
+        self.cont = True
+        self.lock = Lock()
+        self.info_modified = False
+        self.goal_modified = False
+        self.flushing = False
+
+    def addGoal(self, goal):
+        with self.lock:
+            self.goal.append(goal);
+            self.goal_modified = True
+            self.event.set()
+
+    def addInfo(self, info):
+        with self.lock:
+            if self.flushing:
+                request(self.printer.vim, RemoveInfoRequester(self.printer))
+                self.flushing = False
+                self.info = []
+            self.info.append(info);
+            self.info_modified = True
+            self.event.set()
+
+    def flushInfo(self):
+        with self.lock:
+            self.printer.debug("Flushing\n")
+            self.flushing = True
+            if not self.info_modified:
+                self.info = []
+
+    def stop(self):
+        self.cont = False
+
+    def run(self):
+        try:
+            while self.cont:
+                self.event.wait(0.1)
+                with self.lock:
+                    self.event.clear()
+                    canFlush = False
+                    if self.info_modified and self.info != []:
+                        request(self.printer.vim, InfoRequester(self.printer, self.info))
+                        self.info = []
+                        self.info_modified = False
+                        if self.flushing:
+                            canFlush = True
+                    if self.goal_modified and self.goal != []:
+                        request(self.printer.vim, GoalRequester(self.printer, self.goal.pop()))
+                        self.goal_modified = False
+        except e:
+            self.printer.debug(str(e))
+
 class Actionner(Thread):
     def __init__(self, vim):
         Thread.__init__(self)
@@ -367,11 +454,14 @@ class Actionner(Thread):
         self.coqtopbin = parser.getCoqtop()
         self.vim = vim
         self.buf = self.vim.current.buffer
+        self.printer = Printer(self)
+        self.printer.start()
 
+        self.info = []
         self.must_stop = False
         self.running_lock = Lock()
-        self.valid_dots = []
         self.running_dots = []
+        self.valid_dots = []
         self.actions = []
         self.redrawing = False
         self.redraw_asked = False
@@ -398,6 +488,8 @@ class Actionner(Thread):
     def stop(self):
         self.must_stop = True
         self.ct.kill()
+        self.printer.stop()
+        self.printer.join()
 
     def debug(self, msg):
         if self.debug_wanted:
@@ -425,11 +517,14 @@ class Actionner(Thread):
         return m
 
     def ask_redraw(self):
+        quit = False
         with self.running_lock:
             if self.redrawing:
                 self.redraw_asked = True
-                return
+                quit = True
             self.redrawing = True
+        if quit:
+            return
         self.vim.async_call(recolor, self)
 
     def check_modification(self):
@@ -449,11 +544,11 @@ class Actionner(Thread):
         with self.running_lock:
             res = request(self.vim, FullstepRequester(self))
             step = res['step']
-            if step is None: return
-            message = res['message']
-            self.running_dots.insert(0, res['running'])
-            self.ct.advance(res['message'], encoding)
-            self.ct.goals(True)
+            if step is not None:
+                message = res['message']
+                self.running_dots.insert(0, res['running'])
+                self.ct.advance(res['message'], encoding)
+                self.ct.goals(True)
         self.ask_redraw()
 
     def undo(self, args = []):
@@ -468,8 +563,8 @@ class Actionner(Thread):
         if steps < 1 or self.valid_dots == []:
             return
 
+        self.ct.rewind(steps)
         with self.running_lock:
-            self.ct.rewind(steps)
             self.valid_dots = self.valid_dots[:len(self.valid_dots) - steps]
             self.ct.goals()
         if len(args) == 0:
@@ -504,7 +599,6 @@ class Actionner(Thread):
         with self.running_lock:
             if self.running_dots != []:
                 self.ct.interupt()
-                self.running_dots = []
         self.ask_redraw()
 
     def check(self, terms):
@@ -566,45 +660,39 @@ class Actionner(Thread):
                 self.actions = self.actions[1:]
         except BaseException as e:
             self.exception = e
-        #if self.hl_ok_src != None:
-        #    self.buf.clear_highlight(self.hl_ok_src)
-        #    self.hl_ok_src = None
-        #if self.hl_progress_src != None:
-        #    self.buf.clear_highlight(self.hl_progress_src)
-        #    self.hl_progress_src = None
-        #if self.hl_error_src != None:
-        #    self.buf.clear_highlight(self.hl_error_src)
-        #    self.hl_error_src = None
-        #if self.hl_error_command_src != None:
-        #    self.buf.clear_highlight(self.hl_error_command_src)
-        #    self.hl_error_command_src = None
 
     def parseMessage(self, msg, msgtype):
         if isinstance(msg, Ok):
             if msgtype == "addgoal":
-                self.vim.async_call(regoal, self, msg.val)
                 with self.running_lock:
                     if self.running_dots != []:
                         dot = self.running_dots.pop()
                         self.valid_dots.append(dot)
                 self.vim.async_call(goto_last_dot, self)
-                self.ask_redraw()
-                self.vim.async_call(reinfo, self, msg.msg)
-            if msgtype == "goal":
-                self.vim.async_call(regoal, self, msg.val)
-            if msgtype == "query":
-                self.vim.async_call(reinfo, self, msg.msg)
+            self.ask_redraw()
         elif msgtype == "goal":
-            pass
-        elif msgtype == "query":
-            self.vim.async_call(reinfo, self, msg.err)
+            with self.running_lock:
+                self.running_dots = []
+            self.ask_redraw()
         else:
             if isinstance(msg, Err):
                 with self.running_lock:
-                    self.vim.async_call(reinfo, self, msg.err)
-                    self.vim.async_call(reerror, self, self.running_dots.pop(), msg.loc_s, msg.loc_e)
+                    self.printer.flushInfo()
+                    self.printer.addInfo(msg.err)
+                    if self.running_dots != []:
+                        self.vim.async_call(reerror, self, self.running_dots.pop(), msg.loc_s, msg.loc_e)
                     self.ct.silent_interupt()
                     self.running_dots = []
+                self.ask_redraw()
+
+    def addInfo(self, info):
+        self.printer.addInfo(info)
+
+    def flushInfo(self):
+        self.printer.flushInfo()
+
+    def addGoal(self, goals):
+        self.printer.addGoal(goals)
 
     def showError(self, pos, start, end):
         """Show error by highlighting the area. POS is the position of the next dot,
@@ -642,8 +730,8 @@ the previous dot."""
         col = col + start
         eline = line
         while len(self.buf[eline]) - ecol < end:
-            eline = eline+1
             diff = len(self.buf[eline]) - ecol
+            eline = eline+1
             ecol = 0
             end = end - diff
         ecol = ecol + end
@@ -654,9 +742,17 @@ the previous dot."""
         if line != eline:
             self.buf.add_highlight("CoqError", eline, 0, ecol, src_id=self.hl_error_src)
 
-    def showInfo(self, info):
+    def removeInfo(self):
+        if not hasattr(self, 'info_buf'):
+            return
         buf = self.find_buf(self.info_buf)
         del buf[:]
+
+    def showInfo(self, info):
+        if not hasattr(self, 'info_buf'):
+            return
+        buf = self.find_buf(self.info_buf)
+        self.debug("Print info: " + str(info) + "\n")
         if isinstance(info, list):
             for i in info:
                 self.showOneInfo(buf, i)
@@ -681,35 +777,18 @@ the previous dot."""
         for l in lst:
             buf.append(l)
 
-    def focused(self, goals):
-        if goals == []:
-            return 0
-        if isinstance(goals, Goal):
-            return 1
-        s = 0
-        for g in goals:
-            s += self.focused(g)
-        return s
-
-    def showGoal(self, goal):
+    def showGoal(self, goals):
+        if not hasattr(self, 'goal_buf'):
+            return
         buf = self.find_buf(self.goal_buf)
         blines = []
-        if goal is None:
-            del buf[:]
-            return
-        if (not hasattr(goal, 'val')) and (isinstance(goal, tuple) or isinstance(goal, list)):
-            for g in goal:
-                return self.showGoal(g)
-            return
-        if goal.val is None:
+        if goals is None:
             blines.append('No goals.')
         else:
-            goals = goal.val
             sub_goals = goals.fg
-            unfocused_goals = goals.bg
-
-            nb_unfocused = self.focused(unfocused_goals)
+            nb_unfocused = goals.bg
             nb_subgoals = len(sub_goals)
+
             plural_opt = '' if nb_subgoals == 1 else 's'
             blines.append('%d subgoal%s (%d unfocused)' % (nb_subgoals, plural_opt, nb_unfocused))
             blines.append('')
@@ -718,22 +797,9 @@ the previous dot."""
                 _id = sub_goal.id
                 hyps = sub_goal.hyp
                 ccl = sub_goal.ccl
-                if isinstance(ccl, RichPP):
-                    try:
-                        ccl.parts.remove(None)
-                    except:
-                        pass
-                    ccl = ''.join(ccl.parts)
                 if idx == 0:
                     # we print the environment only for the current subgoal
                     for hyp in hyps:
-                        if isinstance(hyp, RichPP):
-                            hyp = hyp.parts
-                            try:
-                                hyp.remove(None)
-                            except:
-                                pass
-                            hyp = ''.join(hyp)
                         lst = map(lambda s: s.encode('utf-8'), hyp.split('\n'))
                         for line in lst:
                             blines.append(line)
@@ -753,10 +819,10 @@ the previous dot."""
         self.hl_progress_src = None
 
         # Color again
-        if self.hl_error_src != None:
+        if self.hl_error_src != None and not self.error_shown:
             self.buf.clear_highlight(self.hl_error_src)
             self.hl_error_src = None
-        if self.hl_error_command_src != None:
+        if self.hl_error_command_src != None and not self.error_shown:
             self.buf.clear_highlight(self.hl_error_command_src)
             self.hl_error_command_src = None
         if self.valid_dots != []:
