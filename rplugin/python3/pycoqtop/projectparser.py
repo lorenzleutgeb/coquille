@@ -1,3 +1,22 @@
+import os
+import subprocess
+
+class Version:
+    def __init__(self, version):
+        self.currentVersion = version
+
+    def is86(self):
+        return self.currentVersion[0] == '8' and self.currentVersion[1] == '6'
+
+    def isatleast89(self):
+        return self.currentVersion[0] == '8' and self.currentVersion[1] >= '9'
+
+    def is_allowed(self):
+        return (self.currentVersion[0] == '8') and (int(self.currentVersion[1]) >= 6)
+
+    def __str__(self):
+        return '.'.join(self.currentVersion)
+
 class ProjectParser():
     def __init__(self, filename):
         self.R = []
@@ -23,6 +42,11 @@ class ProjectParser():
 
         if 'COQBIN' in self.variables:
             self.coqtop = self.variables['COQBIN'] + '/coqtop'
+
+        try:
+            self.version()
+        except:
+            pass
 
     def parseLine(self, sline):
         if len(sline) < 2:
@@ -50,3 +74,22 @@ class ProjectParser():
 
     def getCoqtop(self):
         return self.coqtop
+
+    def version(self):
+        options = [self.coqtop, '--print-version']
+        if os.name == 'nt':
+            coqtop = subprocess.Popen(options,
+                stdin = subprocess.PIPE, stdout = subprocess.PIPE,
+                stderr = subprocess.STDOUT)
+        else:
+            coqtop = subprocess.Popen(options,
+                stdin = subprocess.PIPE, stdout = subprocess.PIPE)
+        fd = coqtop.stdout.fileno()
+        data = os.read(fd, 0x4000).decode("utf-8")
+        version = data.split(' ')[0]
+        version = Version(version.split('.'))
+        if version.isatleast89():
+            self.coqtop = 'coqidetop'
+            if 'COQBIN' in self.variables:
+                self.coqtop = self.variables['COQBIN'] + '/coqidetop'
+        return version

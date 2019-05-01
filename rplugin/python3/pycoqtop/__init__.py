@@ -1,6 +1,6 @@
 import neovim
 
-from .coqtop import new_coqtop, Version
+from .coqtop import new_coqtop
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
@@ -449,9 +449,9 @@ class Actionner(Thread):
         Thread.__init__(self)
 
         coqproject = self.findCoqProject(os.getcwd())
-        parser = ProjectParser(coqproject)
-        self.ct = new_coqtop(self, parser)
-        self.coqtopbin = parser.getCoqtop()
+        self.parser = ProjectParser(coqproject)
+        self.ct = new_coqtop(self, self.parser)
+        self.coqtopbin = self.parser.getCoqtop()
         self.vim = vim
         self.buf = self.vim.current.buffer
         self.printer = Printer(self)
@@ -496,20 +496,7 @@ class Actionner(Thread):
             self.debug_msg += msg
 
     def version(self, args=[]):
-        options = [self.coqtopbin, '--print-version']
-        if os.name == 'nt':
-            coqtop = subprocess.Popen(options + list(args),
-                stdin = subprocess.PIPE, stdout = subprocess.PIPE,
-                stderr = subprocess.STDOUT)
-        else:
-            coqtop = subprocess.Popen(options + list(args),
-                stdin = subprocess.PIPE, stdout = subprocess.PIPE)
-        fd = coqtop.stdout.fileno()
-        data = os.read(fd, 0x4000).decode("utf-8")
-        version = data.split(' ')[0]
-        self.currentVersion = Version(version.split('.'))
-        self.ct.currentVersion = self.currentVersion
-        return self.currentVersion
+        return self.parser.version()
 
     def flush_debug(self):
         m = self.debug_msg

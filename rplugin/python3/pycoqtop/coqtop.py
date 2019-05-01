@@ -9,19 +9,6 @@ from .coqapi import API, Ok, Err
 from .coqxml import CoqParser
 from .xmltype import *
 
-class Version:
-    def __init__(self, version):
-        self.currentVersion = version
-
-    def is86(self):
-        return self.currentVersion[0] == '8' and self.currentVersion[1] == '6'
-
-    def is_allowed(self):
-        return (self.currentVersion[0] == '8') and (int(self.currentVersion[1]) >= 6)
-
-    def __str__(self):
-        return '.'.join(self.currentVersion)
-
 
 class Messenger(Thread):
     def __init__(self, coqtop):
@@ -132,10 +119,15 @@ class CoqQuery:
 
     def get_string(self):
         a = API()
-        if self.coqtop.currentVersion.is86():
-            return a.get_call_msg('Query', (self.instr, self.coqtop.state_id))
-        else:
-            return a.get_call_msg('Query', (RouteId(0), (self.instr, self.coqtop.state_id)))
+        return a.get_call_msg('Query', (RouteId(0), (self.instr, self.coqtop.state_id)))
+
+class CoqQuery86(CoqQuery):
+    def __init__(self, coqtop, instr):
+        CoqQuery.__init__(coqtop, instr)
+
+    def get_string(self):
+        a = API()
+        return a.get_call_msg('Query', (self.instr, self.coqtop.state_id))
 
 class CoqGoal:
     def __init__(self, coqtop, advance = False):
@@ -153,6 +145,8 @@ def ignore_sigint():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 def new_coqtop(printer, parser):
+    if parser.version().is86():
+        return CoqTop86(printer, parser)
     return CoqTop(printer, parser)
 
 class CoqTop:
@@ -280,25 +274,25 @@ class CoqTop:
         self.messenger.add_message(Add(self, instr))
 
     def check(self, terms):
-        self.messenger.add_message(CoqQuery(self, "Check ({}).".format(terms)))
+        self.query("Check ({}).".format(terms))
 
     def dolocate(self, terms):
         if " " in terms:
-            self.messenger.add_message(CoqQuery(self, "Locate ({}).".format(terms)))
+            self.query("Locate ({}).".format(terms))
         else:
-            self.messenger.add_message(CoqQuery(self, "Locate {}.".format(terms)))
+            self.query("Locate {}.".format(terms))
 
     def doprint(self, terms):
         if " " in terms:
-            self.messenger.add_message(CoqQuery(self, "Print ({}).".format(terms)))
+            self.query("Print ({}).".format(terms))
         else:
-            self.messenger.add_message(CoqQuery(self, "Print {}.".format(terms)))
+            self.query("Print {}.".format(terms))
 
     def search(self, terms):
-        self.messenger.add_message(CoqQuery(self, "Search ({}).".format(terms)))
+        self.query("Search ({}).".format(terms))
 
     def searchabout(self, terms):
-        self.messenger.add_message(CoqQuery(self, "SearchAbout {}.".format(terms)))
+        self.query("SearchAbout {}.".format(terms))
 
     def query(self, terms):
         self.messenger.add_message(CoqQuery(self, terms))
@@ -347,3 +341,9 @@ class CoqTop:
             self.state_id = r.state_id
         return False
 
+class CoqTop86(CoqTop):
+    def __init__(self, printer, parser):
+        CoqTop.__init__(self, printer, parser)
+
+    def query(self, terms):
+        self.messenger.add_message(CoqQuery86(self, terms))
