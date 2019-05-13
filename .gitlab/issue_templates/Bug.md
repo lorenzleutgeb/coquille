@@ -11,8 +11,8 @@ Environment
 
 * Coq version (run `coqtop -v` if unsure): 
 * Neovim version (run `nvim -v` if unsure): 
+* Coquille commit (run `git log -1` in coquille's directory if unsure): 
 * I have run `:UpdateRemotePlugins` in neovim but it didn't help: 
-* Branch (run `git branch` if unsure): 
 
 Description
 ===========
