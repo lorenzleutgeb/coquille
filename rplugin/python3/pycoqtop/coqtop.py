@@ -123,7 +123,7 @@ class CoqQuery:
 
 class CoqQuery86(CoqQuery):
     def __init__(self, coqtop, instr):
-        CoqQuery.__init__(coqtop, instr)
+        CoqQuery.__init__(self, coqtop, instr)
 
     def get_string(self):
         a = API()
