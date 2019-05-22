@@ -23,7 +23,10 @@ setlocal nosmartindent
 if !exists("no_coq_comments")
   if (has("comments"))
     setlocal comments=srn:(*,mb:*,exn:*)
-    setlocal fo=cqort
+    " There is a bug somewhere that prevents nvim (and vim) to handle middle
+    " character properly: star bullets are handled as comments. This however
+    " disables comment autocompletion :/
+    "setlocal fo=cqort
   endif
 endif
 

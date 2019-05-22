@@ -126,19 +126,6 @@ You can set the following variable to modify Coquille's behavior:
         (default = 'false')         move your cursor to the end of the lock zone
                                     after calls to CoqNext or CoqUndo
 
-Because of a [bug](https://github.com/neovim/neovim/issues/10045) in Neovim,
-lines starting with a star will have a strange behavior. When creating a new
-line with the 'o' command, the line will be copied. That behavior is related
-to comments handling in neovim, so as a workaround you can add this to your
-`~/.config/nvim/init.vim`:
-
-```vim
-let no_coq_comments=1
-```
-
-Alternatively from your buffer, you can run `setlocal comments=` to disable
-comments handling for that buffer.
-
 Screenshoots
 ------------
 
