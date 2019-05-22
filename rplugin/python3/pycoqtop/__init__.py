@@ -570,6 +570,10 @@ class Actionner(Thread):
             predicate = lambda x: x <= (cline - 1, ccol)
             lst = list(filter(predicate, self.valid_dots))
             steps = len(self.valid_dots) - len(lst)
+            (line, col)  = lst[-1] if lst and lst != [] else (0,0)
+            l = request(self.vim, LineRequester(self.buf, line))
+            if lst and lst != [] and l[col-1] != '.':
+                steps = steps + 1
             self.undo([steps])
         else:
             res = request(self.vim, FullstepsRequester(self, cline, ccol))
