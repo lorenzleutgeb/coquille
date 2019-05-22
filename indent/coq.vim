@@ -26,7 +26,9 @@ if !exists("no_coq_comments")
     " There is a bug somewhere that prevents nvim (and vim) to handle middle
     " character properly: star bullets are handled as comments. This however
     " disables comment autocompletion :/
-    "setlocal fo=cqort
+    " Prevent using default option value for VHDL, since we're using coq;
+    " reset to default nvim value.
+    setlocal fo=tcqj
   endif
 endif
 
