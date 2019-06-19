@@ -12,7 +12,7 @@ class Version:
         return self.currentVersion[0] == '8' and self.currentVersion[1] >= '9'
 
     def is_allowed(self):
-        return (self.currentVersion[0] == '8') and (int(self.currentVersion[1]) >= 6)
+        return (self.currentVersion[0] == '8') and (int(self.currentVersion[1].split("+")[0]) >= 6)
 
     def __str__(self):
         return '.'.join(self.currentVersion)
