@@ -448,7 +448,16 @@ class Actionner(Thread):
     def __init__(self, vim):
         Thread.__init__(self)
 
-        coqproject = self.findCoqProject(os.getcwd())
+        # Find current filename or use current working directory if there is
+        # no open file.
+        filename = vim.current.buffer.name
+        if filename != "" and filename[0] == '/':
+            filename = os.path.dirname(filename)
+        else:
+            filename = os.getcwd()
+
+        # Then find a _CoqProject inside that directory or any parent directory.
+        coqproject = self.findCoqProject(filename)
         self.parser = ProjectParser(coqproject)
         self.ct = new_coqtop(self, self.parser)
         self.coqtopbin = self.parser.getCoqtop()
