@@ -29,6 +29,8 @@ class ProjectParser():
             self.R = [('.', '')]
             return
 
+        self.dirname = os.path.dirname(filename)
+
         lines = []
         with open(filename) as f:
             line = f.readline()
@@ -51,14 +53,21 @@ class ProjectParser():
     def parseLine(self, sline):
         if len(sline) < 2:
             return
+
+        # Try to run coq with absolute paths as configuration, if filenames are
+        # relative to _CoqProject.
+        directory = sline[1].strip("\"'")
+        if directory[0] != "/":
+            directory = self.dirname + "/" + directory
+
         if sline[0] == '-R':
-            self.R.append((sline[1].strip("\"'"), sline[2].strip("\"'")))
+            self.R.append((directory, sline[2].strip("\"'")))
             self.parseLine(sline[3:])
         if sline[0] == '-Q':
-            self.Q.append((sline[1].strip("\"'"), sline[2].strip("\"'")))
+            self.Q.append((directory, sline[2].strip("\"'")))
             self.parseLine(sline[3:])
         if sline[0] == '-I':
-            self.I.append(sline[1].strip("\"'"))
+            self.I.append(directory)
             self.parseLine(sline[2:])
         if sline[1] == "=":
             self.variables[sline[0]] = ' '.join(sline[2:]).strip('"\'')
