@@ -69,7 +69,7 @@ function! coquille#stop()
         let w:coquille_running="false"
     endif
 
-    if w:coquille_running=='true'
+    if w:coquille_running!='false'
         call CoqStop()
     endif
 endfunction
