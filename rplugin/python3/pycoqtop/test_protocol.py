@@ -2,9 +2,13 @@ from . import Actionner
 from .coqtop import CoqTop
 from .projectparser import ProjectParser
 
+class FakeBuffer:
+    def __init__(self):
+        self.name = 'a'
+
 class FakeCurrent:
     def __init__(self):
-        self.buffer = None
+        self.buffer = FakeBuffer()
 
 class FakeVim:
     def __init__(self):

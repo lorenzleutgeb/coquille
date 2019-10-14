@@ -101,7 +101,7 @@ def parse_value(xml):
         parts = []
         child = 0
         try:
-            c = xml.getchildren()[child]
+            c = list(xml)[child]
         except:
             c = None
         for p in xml.itertext():
@@ -112,20 +112,23 @@ def parse_value(xml):
                 parts.append(parse_value(c))
                 child = child + 1
                 try:
-                    c = xml.getchildren()[child]
+                    c = list(xml)[child]
                 except:
                     c = None
             parts.append(p)
         return RichPP(parts)
     elif xml.tag == 'message':
-        for c in xml.getchildren():
+        for c in list(xml):
             if c.tag == 'richpp':
                 return [parse_value(c)]
 
 class Ok:
     def __init__(self, state_id):
         if not state_id is None:
-            self.state_id = StateId(int(state_id))
+            if isinstance(state_id, StateId):
+                self.state_id = state_id
+            else:
+                self.state_id = StateId(int(state_id))
         else:
             self.state_id = None
 
@@ -151,7 +154,7 @@ class API:
         return ET.tostring(xml, encoding)
 
     def response_end(self, xml):
-        for c in xml.getchildren():
+        for c in list(xml):
             if c.tag == 'value':
                 return False
         return True
@@ -160,15 +163,16 @@ class API:
         messageNodes = []
         valueNodes = []
         valueNode = None
-        for c in xml.getchildren():
+        for c in list(xml):
+            print(c)
             if c.tag == 'value':
                 valueNodes.append(c)
             if c.tag == 'message':
                 messageNodes.append(c)
             if c.tag == 'feedback':
-                for cc in c.getchildren():
+                for cc in list(c):
                     if cc.tag == 'feedback_content' and cc.get('val') == 'message':
-                        for ccc in cc.getchildren():
+                        for ccc in list(cc):
                             if ccc.tag == 'message':
                                 messageNodes.append(ccc)
         if len(valueNodes) > 1:
@@ -180,7 +184,10 @@ class API:
             valueNode = valueNodes[0]
         assert (valueNode != None), "Unexpected answer from coqtop: {}".format(ET.tostring(xml))
         if valueNode.get('val') == 'good':
-            return Ok(parse_value(valueNode[0]), messageNodes)
+            p = parse_value(valueNode[0])
+            if isinstance(p[0], StateId):
+                return Ok(p[0])
+            return Ok(None)
         if valueNode.get('val') == 'fail':
-            return Err(parse_value(valueNode[1]), messageNodes, valueNode.get('loc_s'), valueNode.get('loc_e'))
+            return Err(messageNodes, valueNode.get('loc_s'), valueNode.get('loc_e'))
         assert False, "Unexpected answer from coqtop: {}".format(ET.tostring(xml))
