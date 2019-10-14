@@ -67,7 +67,9 @@ endif
 function! coquille#stop()
     if !exists('w:coquille_running')
         let w:coquille_running="false"
-    else
+    endif
+
+    if w:coquille_running=='true'
         call CoqStop()
     endif
 endfunction
