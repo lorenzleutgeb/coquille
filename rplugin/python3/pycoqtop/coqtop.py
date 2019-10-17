@@ -230,16 +230,9 @@ class CoqTop:
 
     def kill(self):
         if self.coqtop:
-            self.printer.vim.command("echo 'Stoping messenger'")
             self.messenger.stop()
-            self.printer.vim.command("echo 'Stoping parser'")
             self.parser.stop()
-            time.sleep(0.2)
-            self.printer.vim.command("echo 'Joining parser'")
-            time.sleep(0.2)
             self.parser.join()
-            self.printer.vim.command("echo 'Joining messenger'")
-            time.sleep(0.2)
             self.messenger.join()
             try:
                 self.coqtop.terminate()
