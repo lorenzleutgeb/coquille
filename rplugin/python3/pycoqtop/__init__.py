@@ -501,6 +501,13 @@ class Actionner(Thread):
         self.printer.stop()
         self.printer.join()
 
+    def join(self):
+        self.buf.clear_highlight(self.hl_error_src)
+        self.buf.clear_highlight(self.hl_error_command_src)
+        self.buf.clear_highlight(self.hl_progress_src)
+        self.buf.clear_highlight(self.hl_ok_src)
+        Thread.join(self)
+
     def debug(self, msg):
         if self.debug_wanted:
             self.debug_msg += msg
