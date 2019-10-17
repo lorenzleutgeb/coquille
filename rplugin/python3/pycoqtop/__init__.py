@@ -45,6 +45,7 @@ class Main(object):
 
     @neovim.function('CoqLaunch', sync=True)
     def launch(self, args=[]):
+        self.vim.call("coquille#define_running")
         if self.vim.eval("w:coquille_running") != 'false':
             self.vim.command('echo "Coquille is already running in this window!"')
             return

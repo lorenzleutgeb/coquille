@@ -64,10 +64,14 @@ if !exists('coquille_auto_move')
   let g:coquille_auto_move="false"
 endif
 
-function! coquille#stop()
+function! coquille#define_running()
     if !exists('w:coquille_running')
         let w:coquille_running="false"
     endif
+endfunction
+
+function! coquille#stop()
+    call coquille#define_running()
 
     if w:coquille_running!='false'
         call CoqStop()
