@@ -269,7 +269,7 @@ class CoqTop:
         self.shouldRewind = self.remove_answer(event, self.calltype)
         self.printer.debug("\nEnd of remove_answer\n")
         self.calltype = None
-        with self.waiting_lock and self.messenger.cont:
+        with self.waiting_lock:
             self.answer_event.set()
 
     def goals(self, advance = False):
