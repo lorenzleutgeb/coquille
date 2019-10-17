@@ -91,10 +91,11 @@ class Messenger(Thread):
                     time.sleep(0.2)
                     continue
 
-                self.waiting = True
-                self.coqtop.wait_answer()
-                self.waiting = False
-                self.guarded_interupt(mtype)
+                if self.cont:
+                    self.waiting = True
+                    self.coqtop.wait_answer()
+                    self.waiting = False
+                    self.guarded_interupt(mtype)
 
             with self.lock:
                 self.messages = []
@@ -229,18 +230,23 @@ class CoqTop:
 
     def kill(self):
         if self.coqtop:
+            self.printer.vim.command("echo 'Stoping messenger'")
+            self.messenger.stop()
+            self.printer.vim.command("echo 'Stoping parser'")
+            self.parser.stop()
+            time.sleep(0.2)
+            self.printer.vim.command("echo 'Joining parser'")
+            time.sleep(0.2)
+            self.parser.join()
+            self.printer.vim.command("echo 'Joining messenger'")
+            time.sleep(0.2)
+            self.messenger.join()
             try:
                 self.coqtop.terminate()
                 self.coqtop.communicate()
             except OSError:
                 pass
             self.coqtop = None
-            self.printer.vim.command("echo 'Stoping messenger'")
-            self.messenger.stop()
-            self.printer.vim.command("echo 'Stoping parser'")
-            self.parser.stop()
-            self.printer.vim.command("echo 'Joining messenger'")
-            self.messenger.join()
 
     def init(self):
         a = API()
@@ -254,14 +260,15 @@ class CoqTop:
         self.calltype = calltype
 
     def wait_answer(self):
-        while not self.answer_event.isSet():
+        while not self.answer_event.isSet() and self.messenger.cont:
             self.answer_event.wait(0.1)
             self.messenger.guarded_interupt(self.calltype)
-        if self.shouldRewind:
+        if self.shouldRewind and self.messenger.cont:
             self.rewind()
 
     def wait_answer_uninterrupted(self):
-        self.answer_event.wait()
+        while not self.answer_event.isSet() and self.messenger.cont:
+            self.answer_event.wait(0.1)
         if self.shouldRewind:
             self.rewind()
 
@@ -269,7 +276,7 @@ class CoqTop:
         self.shouldRewind = self.remove_answer(event, self.calltype)
         self.printer.debug("\nEnd of remove_answer\n")
         self.calltype = None
-        with self.waiting_lock:
+        with self.waiting_lock and self.messenger.cont:
             self.answer_event.set()
 
     def goals(self, advance = False):

@@ -185,4 +185,3 @@ class CoqParser(Thread):
 
     def stop(self):
         self.cont = False
-        self.join()
