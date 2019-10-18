@@ -4,6 +4,7 @@ from .coqtop import new_coqtop
 from .coqapi import Ok, Err
 from .xmltype import *
 from .projectparser import ProjectParser
+from .coqc import coqbuild
 from threading import Event, Lock, Thread
 
 import os
@@ -250,6 +251,20 @@ class Main(object):
         actionner = self.actionners[name]
         self.diditdieyet()
         actionner.showGoal(goal)
+
+    @neovim.function('CoqBuild', sync=False)
+    def build(self, args):
+        name = self.vim.eval("w:coquille_running")
+        if name != 'false':
+            actionner = self.actionners[name]
+            self.diditdieyet()
+            actionner.build()
+        else:
+            try:
+                a = Actionner(self.vim)
+                a.build()
+            except:
+                self.vim.command('echo "Coq could not be found!"')
 
 
 # Start a request from a thread
@@ -518,6 +533,12 @@ class Actionner(Thread):
 
     def version(self, args=[]):
         return self.parser.version()
+
+    def build(self):
+        filename = self.buf.name
+        if filename != "" and filename[0] == '/':
+            coqbuild(filename, self.vim, self.parser.getCoqc(), self.parser.getCoqdep(),
+                    self.parser.getArgs())
 
     def flush_debug(self):
         m = self.debug_msg

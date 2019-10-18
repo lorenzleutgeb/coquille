@@ -22,6 +22,8 @@ class ProjectParser():
         self.R = []
         self.Q = []
         self.I = []
+        self.coqc   = 'coqc'
+        self.coqdep = 'coqdep'
         self.coqtop = 'coqtop'
         self.variables = {}
 
@@ -43,6 +45,8 @@ class ProjectParser():
             self.parseLine(sline)
 
         if 'COQBIN' in self.variables:
+            self.coqc   = self.variables['COQBIN'] + '/coqc'
+            self.coqdep = self.variables['COQBIN'] + '/coqdep'
             self.coqtop = self.variables['COQBIN'] + '/coqtop'
 
         try:
@@ -81,6 +85,12 @@ class ProjectParser():
     def getR(self):
         return self.R
 
+    def getCoqc(self):
+        return self.coqc
+
+    def getCoqdep(self):
+        return self.coqdep
+
     def getCoqtop(self):
         return self.coqtop
 
@@ -102,3 +112,18 @@ class ProjectParser():
             if 'COQBIN' in self.variables:
                 self.coqtop = self.variables['COQBIN'] + '/coqidetop'
         return version
+
+    def getArgs(self):
+        options = []
+        for r in self.I:
+            options.append('-I')
+            options.append(r)
+        for r in self.Q:
+            options.append('-Q')
+            options.append(r[0])
+            options.append(r[1])
+        for r in self.R:
+            options.append('-R')
+            options.append(r[0])
+            options.append(r[1])
+        return options

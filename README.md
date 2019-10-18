@@ -36,13 +36,26 @@ required version.
 To launch Coquille on your Coq file, run `:call CoqLaunch()` which will make the
 functions:
 
-- CoqNext()
-- CoqToCursor()
-- CoqUndo()
-- CoqStop()
-- CoqCancel()
+- CoqNext(): Evaluate the next coq statement,
+- CoqToCursor(): Evaluate every coq statement between the last and cursor position,
+  or undo every statement below the cursor,
+- CoqUndo(): Undo the last statement,
+- CoqStop(): Stop the coq session,
+- CoqCancel(): Cancel a coq statement evaluation.
 
 available to you.
+
+Additionaly, you can access the following functions at any time:
+
+- CoqVersion(): Show coq's version,
+- CoqBuild(): Build the current coq file and its dependencies.
+
+CoqBuild is an experimental feature that allows you to build the current file
+and all its dependencies that have newer sources. This generates `.vo` files.
+It is especially useful when you have multiple files in a coq development. If
+you have multiple files open and you modify them in parallel, you can rebuild
+them immediately from neovim instead of changing terminal. This feature uses
+coqdep and coqc directly and do not rely on a Makefile or any building tool.
 
 By default Coquille forces no mapping for these commands, however two sets of
 mapping are already defined and you can activate them by adding:
@@ -110,6 +123,8 @@ following commands are available:
  - CoqCancel
  - CoqToCursor
  - CoqUndo
+ - CoqVersion
+ - CoqBuild
  - CoqQuery
  - CoqCheck
  - CoqLocate

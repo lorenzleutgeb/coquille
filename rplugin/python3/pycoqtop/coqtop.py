@@ -167,9 +167,7 @@ class CoqTop:
         self.calltype = "init"
         self.shouldRewind = False
         self.coqtopbin = parser.getCoqtop()
-        self.I = parser.getI()
-        self.Q = parser.getQ()
-        self.R = parser.getR()
+        self.args = parser.getArgs()
         self.worker = 'master'
 
     def setWorker(self, worker):
@@ -197,17 +195,7 @@ class CoqTop:
             self.kill()
         self.messenger = Messenger(self)
         options = self.getDefaultOptions()
-        for r in self.I:
-            options.append('-I')
-            options.append(r)
-        for r in self.Q:
-            options.append('-Q')
-            options.append(r[0])
-            options.append(r[1])
-        for r in self.R:
-            options.append('-R')
-            options.append(r[0])
-            options.append(r[1])
+        options += self.args
         try:
             if os.name == 'nt':
                 self.coqtop = subprocess.Popen(options + list(args),
