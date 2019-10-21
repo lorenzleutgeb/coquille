@@ -155,7 +155,9 @@ class CoqParser(Thread):
         self.parser = ET.XMLParser(target=self.target)
         self.parser.feed("""
 <!DOCTYPE coq [
-  <!ENTITY nbsp \"&#xA0;\">
+  <!-- we replace non-breakable spaces with normal spaces, because it would
+        make copy-pasting harder -->
+  <!ENTITY nbsp \" \">
   <!ENTITY gt \">\">
   <!ENTITY lt \"<\">
   <!ENTITY apos \"'\">
