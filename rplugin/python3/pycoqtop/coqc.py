@@ -33,8 +33,13 @@ def computedeps(coqfile, coqdepargs):
             deps[1] = shlex.split(deps[1])
             fdeps.append(deps)
     
+    vofile = Path(coqfile+'o')
+
     vmtime = Path(coqfile).stat().st_mtime
-    vomtime = Path(coqfile+'o').stat().st_mtime
+    if vofile.exists():
+        vomtime = vofile.stat().st_mtime
+    else:
+        vomtime = 0
     todo = {'green': vomtime < vmtime, 'file': coqfile, 'deps': []}
 
     for deps in fdeps:
