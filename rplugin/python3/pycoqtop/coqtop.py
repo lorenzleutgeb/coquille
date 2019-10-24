@@ -76,15 +76,24 @@ class Messenger(Thread):
                         self.printer.debug(">< SENDING NEXT MESSAGE ><\n")
                         message = self.messages.pop()
                         mtype = message.type
+                        addtype = None
+                        if mtype == 'add':
+                            addtype = message.addtype
+
                         with self.coqtop.waiting_lock:
                             if mtype == 'goal' or mtype == 'addgoal':
                                 self.canInteruptHere = True
                                 self.coqtop.parser.nextFlush = False
                             else:
                                 self.canInteruptHere = False
-                            self.coqtop.set_next_answer_type(mtype)
-                            self.coqtop.send_cmd(message.get_string())
-                            self.coqtop.answer_event.clear()
+                            if addtype is None or addtype is not 'comment':
+                                self.coqtop.set_next_answer_type(mtype)
+                                self.coqtop.send_cmd(message.get_string())
+                                self.coqtop.answer_event.clear()
+                            else:
+                                # Fake answer from coqtop when we parse a comment
+                                self.coqtop.remove_answer(Ok(self.coqtop.state_id), mtype)
+                                continue
                         self.printer.debug(">< NEXT MESSAGE SENT ><\n")
 
                 if sleep:
@@ -103,10 +112,11 @@ class Messenger(Thread):
             self.exception = e
 
 class Add:
-    def __init__(self, coqtop, instr):
+    def __init__(self, coqtop, instr, typ):
         self.coqtop = coqtop
         self.instr = instr
         self.type = "add"
+        self.addtype = typ
 
     def get_string(self):
         a = API()
@@ -263,8 +273,8 @@ class CoqTop:
     def goals(self, advance = False):
         self.messenger.add_message(CoqGoal(self, advance))
 
-    def advance(self, instr, encoding = 'utf8'):
-        self.messenger.add_message(Add(self, instr))
+    def advance(self, instr, typ, encoding = 'utf8'):
+        self.messenger.add_message(Add(self, instr, typ))
 
     def check(self, terms):
         self.query("Check ({}).".format(terms))

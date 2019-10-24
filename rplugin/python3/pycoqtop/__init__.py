@@ -6,6 +6,7 @@ from .xmltype import *
 from .projectparser import ProjectParser
 from .coqc import coqbuild
 from threading import Event, Lock, Thread
+from .parser import Parser
 
 import os
 import re
@@ -314,7 +315,8 @@ class FullstepRequester(Requester):
         line = (self.obj.buf[eline])[:ecol]
         ecol += len(bytes(line, encoding)) - len(line)
         res['running'] = (eline, ecol + 1)
-        res["message"] = self.obj._between(step['start'], step['stop'])
+        res["message"] = step['content']
+        res["type"] = step['type']
         self.setResult(res)
 
 class FullstepsRequester(FullstepRequester):
@@ -334,21 +336,11 @@ class FullstepsRequester(FullstepRequester):
                     break
                 if res['step']['stop'] <= (self.cline-1, self.ccol):
                     self.obj.running_dots.insert(0, res['running'])
-                    self.obj.ct.advance(res['message'], encoding)
+                    self.obj.ct.advance(res['message'], res['type'], encoding)
                     self.obj.ct.goals(True)
                 else:
                     break
         self.setResult(steps)
-
-class BetweenRequester(Requester):
-    def __init__(self, obj, start, stop):
-        Requester.__init__(self)
-        self.obj = obj
-        self.start = start
-        self.stop = stop
-
-    def request(self):
-        self.setResult(self.obj._between(self.start, self.stop))
 
 class CursorRequester(Requester):
     def __init__(self, vim, buf):
@@ -369,7 +361,7 @@ class LineRequester(Requester):
         self.line = line
 
     def request(self):
-        self.setResult(self.buf[self.line])
+        self.setResult(self.buf[self.line] + '\n')
 
 class GoalRequester(Requester):
     def __init__(self, printer, goals):
@@ -576,7 +568,7 @@ class Actionner(Thread):
             if step is not None:
                 message = res['message']
                 self.running_dots.insert(0, res['running'])
-                self.ct.advance(res['message'], encoding)
+                self.ct.advance(res['message'], res['type'], encoding)
                 self.ct.goals(True)
         self.ask_redraw()
 
@@ -609,13 +601,14 @@ class Actionner(Thread):
         (cline, ccol) = ans
         (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
         if cline <= line or (cline == line + 1 and ccol <= col):
-            predicate = lambda x: x <= (cline - 1, ccol)
+            predicate = lambda x: x <= (cline, ccol)
             lst = list(filter(predicate, self.valid_dots))
             steps = len(self.valid_dots) - len(lst)
             (line, col)  = lst[-1] if lst and lst != [] else (0,0)
-            l = request(self.vim, LineRequester(self.buf, line))
-            if lst and lst != [] and l[col-1] != '.':
-                steps = steps + 1
+            if line == cline:
+                l = request(self.vim, LineRequester(self.buf, line))
+                if lst and lst != [] and l[col-1] != '.':
+                    steps += 1
             self.undo([steps])
         else:
             res = request(self.vim, FullstepsRequester(self, cline, ccol))
@@ -896,149 +889,16 @@ the previous dot."""
             (line, col)  = self.running_dots[0] if self.running_dots else (0,0)
         else:
             (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
-        return self._get_message_range((line, col))
+        p = Parser(self.buf)
+        try:
+            unit = p.getUnit(line, col)
+        except:
+            return None
+        return { 'start':(line,col) , 'stop':(unit[0], unit[1]), 'content': unit[2],
+                'type': unit[3] }
 
     def find_buf(self, num):
         for b in self.vim.buffers:
             if num == b.number:
                 return b
         return None
-
-    def _between(self, begin, end):
-        """
-        Returns a string corresponding to the portion of the buffer between the
-        [begin] and [end] positions.
-        """
-        (bline, bcol) = begin
-        (eline, ecol) = end
-        acc = ""
-        for line, str in enumerate(self.buf[bline:eline + 1]):
-            start = bcol if line == 0 else 0
-            stop  = ecol + 1 if line == eline - bline else len(str)
-            acc += str[start:stop] + '\n'
-        return acc
-
-    def _get_message_range(self, after):
-        """ See [_find_next_chunk] """
-        (line, col) = after
-        end_pos = self._find_next_chunk(line, col)
-        return { 'start':after , 'stop':end_pos } if end_pos is not None else None
-    
-    def _find_next_chunk(self, line, col, encoding='utf-8'):
-        """
-        Returns the position of the next chunk dot after a certain position.
-        That can either be a bullet if we are in a proof, or "a string" terminated
-        by a dot (outside of a comment, and not denoting a path).
-        """
-        blen = len(self.buf)
-        bullets = ['{', '}', '-', '+', '*']
-        # We start by striping all whitespaces (including \n) from the beginning of
-        # the chunk.
-        while line < blen and self.buf[line][col:].strip() == '':
-            line += 1
-            col = 0
-    
-        if line >= blen: return
-    
-        while self.buf[line][col] == ' ' or self.buf[line][col] == '\t': # FIXME: keeping the stripped line would be
-            col += 1                                             #   more efficient.
-    
-        # Then we check if the first character of the chunk is a bullet.
-        # Intially I did that only when I was sure to be in a proof (by looking in
-        # [encountered_dots] whether I was after a "collapsable" chunk or not), but
-        #   1/ that didn't play well with coq_to_cursor (as the "collapsable chunk"
-        #      might not have been sent/detected yet).
-        #   2/ The bullet chars can never be used at the *beginning* of a chunk
-        #      outside of a proof. So the check was unecessary.
-        if self.buf[line][col] in bullets:
-            return (line, col + 1)
-    
-        # We might have a commentary before the bullet, we should be skiping it and
-        # keep on looking.
-        tail_len = len(self.buf[line]) - col
-        if (tail_len - 1 > 0) and self.buf[line][col] == '(' and self.buf[line][col + 1] == '*':
-            com_end = self._skip_comment(line, col + 2, 1)
-            if not com_end: return
-            (line, col) = com_end
-            return self._find_next_chunk(line, col)
-    
-    
-        # If the chunk doesn't start with a bullet, we look for a dot.
-        return self._find_dot_after(line, col, encoding)
-
-    def _find_dot_after(self, line, col, encoding='utf-8'):
-        """
-        Returns the position of the next "valid" dot after a certain position.
-        Valid here means: recognized by Coq as terminating an input, so dots in
-        comments, strings or ident paths are not valid.
-        """
-        if line >= len(self.buf): return
-        s = self.buf[line][col:]
-        dot_pos = s.find('.')
-        com_pos = s.find('(*')
-        str_pos = s.find('"')
-        if com_pos == -1 and dot_pos == -1 and str_pos == -1:
-            # Nothing on this line
-            return self._find_dot_after(line + 1, 0)
-        elif dot_pos == -1 or (com_pos > - 1 and dot_pos > com_pos) or (str_pos > - 1 and dot_pos > str_pos):
-            if str_pos == -1 or (com_pos > -1 and str_pos > com_pos):
-                # We see a comment opening before the next dot
-                com_end = self._skip_comment(line, com_pos + 2 + col, 1)
-                if not com_end: return
-                (line, col) = com_end
-                return self._find_dot_after(line, col)
-            else:
-                # We see a string starting before the next dot
-                str_end = self._skip_str(line, str_pos + col + 1)
-                if not str_end: return
-                (line, col) = str_end
-                return self._find_dot_after(line, col)
-        elif dot_pos < len(s) - 1 and s[dot_pos + 1] != ' ' and s[dot_pos + 1] != '\t':
-            # Sometimes dot are used to access module fields, we don't want to stop
-            # just after the module name.
-            # Example: [Require Import Coq.Arith]
-            return self._find_dot_after(line, col + dot_pos + 1)
-        elif dot_pos + col > 0 and self.buf[line][col + dot_pos - 1] == '.':
-            # FIXME? There might be a cleaner way to express this.
-            # We don't want to capture ".."
-            if dot_pos + col > 1 and self.buf[line][col + dot_pos - 2] == '.':
-                # But we want to capture "..."
-                return (line, dot_pos + col)
-            else:
-                return self._find_dot_after(line, col + dot_pos + 1)
-        else:
-            return (line, dot_pos + col)
-
-    def _skip_str(self, line, col):
-        """
-        Used when we encountered the start of a string before a valid dot (see
-        [_find_dot_after]).
-        Returns the position of the end of the string.
-        """
-        if line >= len(self.buf): return
-        s = self.buf[line][col:]
-        str_end = s.find('"')
-        if str_end > -1:
-            return (line, col + str_end + 1)
-        else:
-            return self._skip_str(line + 1, 0)
-    
-    def _skip_comment(self, line, col, nb_left):
-        """
-        Used when we encountered the start of a comment before a valid dot (see
-        [_find_dot_after]).
-        Returns the position of the end of the comment.
-        """
-        if nb_left == 0:
-            return (line, col)
-    
-        if line >= len(self.buf): return
-        s = self.buf[line][col:]
-        com_start = s.find('(*')
-        com_end = s.find('*)')
-        if com_end > -1 and (com_end < com_start or com_start == -1):
-            return self._skip_comment(line, col + com_end + 2, nb_left - 1)
-        elif com_start > -1:
-            return self._skip_comment(line, col + com_start + 2, nb_left + 1)
-        else:
-            return self._skip_comment(line + 1, 0, nb_left)
