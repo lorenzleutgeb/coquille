@@ -342,6 +342,16 @@ class FullstepsRequester(FullstepRequester):
                     break
         self.setResult(steps)
 
+class BetweenRequester(Requester):
+    def __init__(self, obj, start, stop):
+        Requester.__init__(self)
+        self.obj = obj
+        self.start = start
+        self.stop = stop
+
+    def request(self):
+        self.setResult(self.obj._between(self.start, self.stop))
+
 class CursorRequester(Requester):
     def __init__(self, vim, buf):
         Requester.__init__(self)
@@ -552,13 +562,28 @@ class Actionner(Thread):
         if self.error_shown:
             self.error_shown = False
             self.ask_redraw()
+        # It would be too long to check everything, but incorect to simply
+        # revert anything after the current position of the cursor, since it is
+        # the position *after* the modification, not the position of the modification.
+        # We cannot get the position of the modification, so look for the cursor
+        # position and check everything from at most 3 lines above, just to be
+        # sure we don't forget anything.
         ans = request(self.vim, CursorRequester(self.vim, self.buf))
-        if ans == None:
-            return
-        (cline, ccol) = ans
-        (line, col, msg)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0,"")
-        if cline <= line or (cline == line + 1 and ccol <= col):
-            self.cursor()
+        (line, col) = (0,0)
+        predicate = lambda x: x <= (line-3, 0)
+        valid = list(filter(predicate, self.valid_dots))
+        if valid and len(valid) > 0:
+            (line, col, msg) = valid[-1]
+        n = len(valid)
+        for v in self.valid_dots[n:]:
+            (vline, vcol, vmsg) = v
+            cmsg = request(self.vim, BetweenRequester(self, (line, col), (vline, vcol-2)))
+            self.debug("`{}` :: `{}`".format(cmsg, vmsg))
+            if cmsg != vmsg:
+                self.undo([len(self.valid_dots) - n])
+                break
+            (line, col) = (vline, vcol)
+            n += 1
 
     def next(self):
         encoding = 'utf-8'
@@ -899,3 +924,18 @@ the previous dot."""
             if num == b.number:
                 return b
         return None
+
+    def _between(self, begin, end):
+        """
+        Returns a string corresponding to the portion of the buffer between the
+        [begin] and [end] positions.
+        """
+        (bline, bcol) = begin
+        (eline, ecol) = end
+        acc = ""
+        for line, str in enumerate(self.buf[bline:eline + 1]):
+            start = bcol if line == 0 else 0
+            stop  = ecol + 1 if line == eline - bline else len(str)
+            stopchr = '' if line == eline - bline else '\n'
+            acc += str[start:stop] + stopchr
+        return acc
