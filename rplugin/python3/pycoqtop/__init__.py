@@ -334,7 +334,7 @@ class FullstepsRequester(FullstepRequester):
                 res = self.waitResult()
                 if res['step'] == None:
                     break
-                if res['step']['stop'] <= (self.cline-1, self.ccol):
+                if res['step']['stop'] <= (self.cline, self.ccol):
                     self.obj.running_dots.insert(0, res['running'])
                     self.obj.ct.advance(res['message'], res['type'], encoding)
                     self.obj.ct.goals(True)
@@ -599,16 +599,20 @@ class Actionner(Thread):
         if ans == None:
             return
         (cline, ccol) = ans
+        cline -= 1
         (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
-        if cline <= line or (cline == line + 1 and ccol <= col):
-            predicate = lambda x: x <= (cline, ccol)
+        if cline <= line or (cline == line and ccol <= col):
+            self.debug("cursor: {} :: {}".format(cline, ccol))
+            predicate = lambda x: x <= (cline, ccol+2)
             lst = list(filter(predicate, self.valid_dots))
             steps = len(self.valid_dots) - len(lst)
             (line, col)  = lst[-1] if lst and lst != [] else (0,0)
-            if line == cline:
-                l = request(self.vim, LineRequester(self.buf, line))
-                if lst and lst != [] and l[col-1] != '.':
-                    steps += 1
+            self.debug("last valid: {} :: {}".format(line, col))
+            #if line == cline:
+            #    l = request(self.vim, LineRequester(self.buf, line))
+            #    self.debug(l)
+            #    if lst and lst != [] and l[ccol] != '.':
+            #        steps += 1
             self.undo([steps])
         else:
             res = request(self.vim, FullstepsRequester(self, cline, ccol))
