@@ -314,7 +314,7 @@ class FullstepRequester(Requester):
         (eline, ecol) = step['stop']
         line = (self.obj.buf[eline])[:ecol]
         ecol += len(bytes(line, encoding)) - len(line)
-        res['running'] = (eline, ecol + 1)
+        res['running'] = (eline, ecol + 1, step['content'])
         res["message"] = step['content']
         res["type"] = step['type']
         self.setResult(res)
@@ -556,7 +556,7 @@ class Actionner(Thread):
         if ans == None:
             return
         (cline, ccol) = ans
-        (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
+        (line, col, msg)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0,"")
         if cline <= line or (cline == line + 1 and ccol <= col):
             self.cursor()
 
@@ -600,19 +600,12 @@ class Actionner(Thread):
             return
         (cline, ccol) = ans
         cline -= 1
-        (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
+        (line, col, msg)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0,"")
         if cline <= line or (cline == line and ccol <= col):
-            self.debug("cursor: {} :: {}".format(cline, ccol))
             predicate = lambda x: x <= (cline, ccol+2)
             lst = list(filter(predicate, self.valid_dots))
             steps = len(self.valid_dots) - len(lst)
-            (line, col)  = lst[-1] if lst and lst != [] else (0,0)
-            self.debug("last valid: {} :: {}".format(line, col))
-            #if line == cline:
-            #    l = request(self.vim, LineRequester(self.buf, line))
-            #    self.debug(l)
-            #    if lst and lst != [] and l[ccol] != '.':
-            #        steps += 1
+            (line, col, msg)  = lst[-1] if lst and lst != [] else (0,0,"")
             self.undo([steps])
         else:
             res = request(self.vim, FullstepsRequester(self, cline, ccol))
@@ -620,8 +613,8 @@ class Actionner(Thread):
 
     def goto_last_dot(self):
         if self.vim.eval("g:coquille_auto_move") == 'true':
-            (line, col) = (0,1) if self.valid_dots == [] else self.valid_dots[-1]
-            (line, col) = (line,col) if self.running_dots == [] else self.running_dots[-1]
+            (line, col, msg) = (0,1,"") if self.valid_dots == [] else self.valid_dots[-1]
+            (line, col, msg) = (line,col,"") if self.running_dots == [] else self.running_dots[-1]
             if self.buf.name == self.vim.current.buffer.name:
                 self.vim.current.window.cursor = (line+1, col)
 
@@ -732,7 +725,7 @@ the previous dot."""
         if self.valid_dots == []:
             (line, col) = (0, 0)
         else:
-            (line, col) = self.valid_dots[-1]
+            (line, col, msg) = self.valid_dots[-1]
         (eline, ecol) = pos
         self.error_shown = True
 
@@ -856,12 +849,12 @@ the previous dot."""
             self.buf.clear_highlight(self.hl_error_command_src)
             self.hl_error_command_src = None
         if self.valid_dots != []:
-            (eline, ecol) = self.valid_dots[-1]
+            (eline, ecol, msg) = self.valid_dots[-1]
         else:
             (eline, ecol) = (0, 0)
 
         if self.running_dots != []:
-            (line, col) = self.running_dots[0]
+            (line, col, msg) = self.running_dots[0]
             self.hl_progress_src = self.vim.new_highlight_source()
             self.buf.add_highlight("SentToCoq", eline, ecol, col if eline == line else -1, src_id=self.hl_progress_src)
             for i in range(eline+1, line):
@@ -890,9 +883,9 @@ the previous dot."""
     def findNextStep(self):
         (line, col) = (0,0)
         if self.running_dots != []:
-            (line, col)  = self.running_dots[0] if self.running_dots else (0,0)
+            (line, col, msg)  = self.running_dots[0] if self.running_dots else (0,0,"")
         else:
-            (line, col)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0)
+            (line, col, msg)  = self.valid_dots[-1] if self.valid_dots and self.valid_dots != [] else (0,0,"")
         p = Parser(self.buf)
         try:
             unit = p.getUnit(line, col)
