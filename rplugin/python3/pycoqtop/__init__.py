@@ -751,7 +751,7 @@ the previous dot."""
             (line, col) = (0, 0)
         else:
             (line, col, msg) = self.valid_dots[-1]
-        (eline, ecol) = pos
+        (eline, ecol, msg) = pos
         self.error_shown = True
 
         # Show the yellow background
