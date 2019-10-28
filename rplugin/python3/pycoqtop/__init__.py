@@ -577,7 +577,7 @@ class Actionner(Thread):
         n = len(valid)
         for v in self.valid_dots[n:]:
             (vline, vcol, vmsg) = v
-            cmsg = request(self.vim, BetweenRequester(self, (line, col), (vline, vcol-2)))
+            cmsg = request(self.vim, BetweenRequester(self, (line, col), (vline, vcol-1)))
             if cmsg != vmsg:
                 self.undo([len(self.valid_dots) - n])
                 break
@@ -881,8 +881,6 @@ the previous dot."""
             (eline, ecol, msg) = self.valid_dots[-1]
         else:
             (eline, ecol) = (0, 0)
-        self.debug("Printing valid until {} :: {}\n".format(eline, ecol))
-        self.debug("Which ends with \"{}\".\n".format(self.buf[eline][:ecol]))
         ecol = len(bytes(self.buf[eline][:ecol], encoding))
 
         if self.running_dots != []:
@@ -922,7 +920,6 @@ the previous dot."""
         p = Parser(self.buf)
         try:
             unit = p.getUnit(line, col)
-            self.debug("\n")
         except:
             return None
         return { 'start':(line,col) , 'stop':(unit[0], unit[1]), 'content': unit[2],
