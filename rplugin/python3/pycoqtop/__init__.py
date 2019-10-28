@@ -744,9 +744,10 @@ class Actionner(Thread):
 
     def showError(self, pos, start, end):
         """Show error by highlighting the area. POS is the position of the next dot,
-START is the begining of the actual error, in number of characters from the
-previous dot. END is the end of the actual error, in number of characters from
+START is the begining of the actual error, in number of bytes from the
+previous dot. END is the end of the actual error, in number of bytes from
 the previous dot."""
+        encoding = 'utf-8'
         if self.valid_dots == []:
             (line, col) = (0, 0)
         else:
@@ -777,8 +778,8 @@ the previous dot."""
         ecol = col
         col = col + start
         eline = line
-        while len(self.buf[eline]) - ecol < end:
-            diff = len(self.buf[eline]) - ecol
+        while len(bytes(self.buf[eline], encoding)) - ecol < end:
+            diff = len(bytes(self.buf[eline], encoding)) - ecol
             eline = eline+1
             ecol = 0
             end = end - diff
