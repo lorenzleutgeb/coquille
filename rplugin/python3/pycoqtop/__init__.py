@@ -312,9 +312,9 @@ class FullstepRequester(Requester):
             self.setResult(res)
             return
         (eline, ecol) = step['stop']
-        line = (self.obj.buf[eline])[:ecol]
-        ecol += len(bytes(line, encoding)) - len(line)
-        res['running'] = (eline, ecol + 1, step['content'])
+        #line = (self.obj.buf[eline])[:ecol]
+        #ecol += len(bytes(line, encoding)) - len(line)
+        res['running'] = (eline, ecol, step['content'])
         res["message"] = step['content']
         res["type"] = step['type']
         self.setResult(res)
@@ -752,11 +752,13 @@ the previous dot."""
         else:
             (line, col, msg) = self.valid_dots[-1]
         (eline, ecol, msg) = pos
+        ecol = len(bytes(self.buf[eline][:ecol], encoding))
+        col = len(bytes(self.buf[line][:col], encoding))
         self.error_shown = True
 
         # Show the yellow background
         self.hl_error_command_src = self.vim.new_highlight_source()
-        self.buf.add_highlight("CoqErrorCommand", line, col, ecol-1 if line == eline else -1,
+        self.buf.add_highlight("CoqErrorCommand", line, col, ecol if line == eline else -1,
                 src_id=self.hl_error_command_src)
         if self.hl_progress_src != None:
             self.buf.clear_highlight(self.hl_progress_src)
@@ -764,9 +766,10 @@ the previous dot."""
         for i in range(line+1, eline):
             self.buf.add_highlight("CoqErrorCommand", i, 0, -1, src_id=self.hl_error_command_src)
         if line != eline:
-            self.buf.add_highlight("CoqErrorCommand", eline, 0, ecol-1, src_id=self.hl_error_command_src)
+            self.buf.add_highlight("CoqErrorCommand", eline, 0, ecol, src_id=self.hl_error_command_src)
 
         # Show the red background
+        self.debug('error: {} :: {}\n'.format(start, end))
         self.hl_error_src = self.vim.new_highlight_source()
         while len(bytes(self.buf[line], encoding)) - col < start:
             diff = len(bytes(self.buf[line], encoding)) - col + 1
@@ -861,6 +864,7 @@ the previous dot."""
         buf.append(blines)
 
     def redraw(self, args=[]):
+        encoding = 'utf-8'
         old_hl_ok_src = self.hl_ok_src
         old_hl_progress_src = self.hl_progress_src
         self.hl_ok_src = None
@@ -877,9 +881,13 @@ the previous dot."""
             (eline, ecol, msg) = self.valid_dots[-1]
         else:
             (eline, ecol) = (0, 0)
+        self.debug("Printing valid until {} :: {}\n".format(eline, ecol))
+        self.debug("Which ends with \"{}\".\n".format(self.buf[eline][:ecol]))
+        ecol = len(bytes(self.buf[eline][:ecol], encoding))
 
         if self.running_dots != []:
             (line, col, msg) = self.running_dots[0]
+            col = len(bytes(self.buf[line][:col], encoding))
             self.hl_progress_src = self.vim.new_highlight_source()
             self.buf.add_highlight("SentToCoq", eline, ecol, col if eline == line else -1, src_id=self.hl_progress_src)
             for i in range(eline+1, line):
@@ -891,7 +899,7 @@ the previous dot."""
             self.hl_ok_src = self.vim.new_highlight_source()
             for i in range(0, eline):
                 self.buf.add_highlight("CheckedByCoq", i, 0, -1, src_id=self.hl_ok_src)
-            self.buf.add_highlight("CheckedByCoq", eline, 0, ecol-1, src_id=self.hl_ok_src)
+            self.buf.add_highlight("CheckedByCoq", eline, 0, ecol, src_id=self.hl_ok_src)
 
         if old_hl_ok_src:
             self.buf.clear_highlight(old_hl_ok_src)
@@ -914,6 +922,7 @@ the previous dot."""
         p = Parser(self.buf)
         try:
             unit = p.getUnit(line, col)
+            self.debug("\n")
         except:
             return None
         return { 'start':(line,col) , 'stop':(unit[0], unit[1]), 'content': unit[2],
