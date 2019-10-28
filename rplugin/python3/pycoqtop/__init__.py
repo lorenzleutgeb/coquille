@@ -222,7 +222,7 @@ class Main(object):
         actionner = self.actionners[name]
         actionner.debug_wanted = True
         self.vim.command('echo "running: ' + str(actionner.running_dots) + '"')
-        self.vim.command('echo "valid: ' + str(actionner.valid_dots) + '"')
+        self.vim.command('echo "valid: ' + str(actionner.valid_dots).replace("\"", "\\\"") + '"')
         self.vim.command('echo "state: ' + str(actionner.ct.state_id) + '"')
         self.vim.command('echo "debug: '+str(actionner.flush_debug()).replace("\"", "\\\"")+'"')
 
@@ -578,7 +578,6 @@ class Actionner(Thread):
         for v in self.valid_dots[n:]:
             (vline, vcol, vmsg) = v
             cmsg = request(self.vim, BetweenRequester(self, (line, col), (vline, vcol-2)))
-            self.debug("`{}` :: `{}`".format(cmsg, vmsg))
             if cmsg != vmsg:
                 self.undo([len(self.valid_dots) - n])
                 break
