@@ -891,7 +891,7 @@ the previous dot."""
             self.hl_ok_src = self.vim.new_highlight_source()
             for i in range(0, eline):
                 self.buf.add_highlight("CheckedByCoq", i, 0, -1, src_id=self.hl_ok_src)
-            self.buf.add_highlight("CheckedByCoq", eline, 0, ecol, src_id=self.hl_ok_src)
+            self.buf.add_highlight("CheckedByCoq", eline, 0, ecol-1, src_id=self.hl_ok_src)
 
         if old_hl_ok_src:
             self.buf.clear_highlight(old_hl_ok_src)
