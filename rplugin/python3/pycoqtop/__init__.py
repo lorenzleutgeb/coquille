@@ -757,7 +757,7 @@ the previous dot."""
 
         # Show the yellow background
         self.hl_error_command_src = self.vim.new_highlight_source()
-        self.buf.add_highlight("CoqErrorCommand", line, col, ecol if line == eline else -1,
+        self.buf.add_highlight("CoqErrorCommand", line, col, ecol-1 if line == eline else -1,
                 src_id=self.hl_error_command_src)
         if self.hl_progress_src != None:
             self.buf.clear_highlight(self.hl_progress_src)
@@ -765,12 +765,12 @@ the previous dot."""
         for i in range(line+1, eline):
             self.buf.add_highlight("CoqErrorCommand", i, 0, -1, src_id=self.hl_error_command_src)
         if line != eline:
-            self.buf.add_highlight("CoqErrorCommand", eline, 0, ecol, src_id=self.hl_error_command_src)
+            self.buf.add_highlight("CoqErrorCommand", eline, 0, ecol-1, src_id=self.hl_error_command_src)
 
         # Show the red background
         self.hl_error_src = self.vim.new_highlight_source()
-        while len(self.buf[line]) - col < start:
-            diff = len(self.buf[line]) - col + 1
+        while len(bytes(self.buf[line], encoding)) - col < start:
+            diff = len(bytes(self.buf[line], encoding)) - col + 1
             line = line+1
             col = 0
             start = start - diff
