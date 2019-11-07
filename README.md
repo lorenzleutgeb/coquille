@@ -150,7 +150,7 @@ Because pictures are always the best sellers:
 
 And videos are even better:
 
-[![asciicast](https://asciinema.org/a/ndLDbrpylgAviwIchV3twPmd7.svg)](https://asciinema.org/a/ndLDbrpylgAviwIchV3twPmd7)
+[![asciicast](https://asciinema.org/a/279722.svg)](https://asciinema.org/a/279722)
 
 Testing
 -------
@@ -160,6 +160,13 @@ directory and run:
 
 ```bash
 py.test
+```
+
+If you are a GNU Guix user and a user of my [coq channel](https://framagit.org/tyreunom/guix-coq-channel),
+you can also run the tests for every version of coq with the following script:
+
+```bash
+./test.sh
 ```
 
 [1]: https://framagit.org/tyreunom/coquille/blob/master/autoload/coquille.vim
