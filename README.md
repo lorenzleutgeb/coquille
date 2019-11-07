@@ -6,8 +6,8 @@ favorite editor.
 
 This repository contains a port of coquille to neovim, with full asynchronous
 support, and to the latest coq version. Currently supported versions are 8.6,
-8.7, 8.8 and 8.9. We will keep support for older versions and add support for
-newer versions as they are released.
+8.7, 8.8, 8.9 and 8.10. We will keep support for older versions and add support
+for newer versions as they are released.
 
 Installation
 ------------
@@ -19,7 +19,10 @@ a plugin manager, you can add this line to your `~/.config/nvim/init.vim`:
     set runtimepath+=~/.config/nvim/bundle/coquille
 
 The original coquille was meant to be run with pathogen.  If you use pathogen
-for any reason, you can still use it with this plugin.
+for any reason, you can still use it with this plugin.  There is a small bug
+when you don't use pathogen.  The plugin is loaded too early and some completion
+settings are overriden by neovim incorrectly, because it believes the file is
+a verilog file.
 
 Getting started
 ---------------
@@ -133,7 +136,10 @@ following commands are available:
  - CoqSearchAbout
 
 They work similarly to their functional counterpart, except that their arguments
-don't need to be wrapped in quotes.
+don't need to be wrapped in quotes or parenthesis.
+
+For instance, `:CoqSearch S _ * _ = _` is the same as
+`:call CoqSearch("S _ * _ = _")` .
 
 You can set the following variable to modify Coquille's behavior:
 
@@ -163,7 +169,7 @@ py.test
 ```
 
 If you are a GNU Guix user and a user of my [coq channel](https://framagit.org/tyreunom/guix-coq-channel),
-you can also run the tests for every version of coq with the following script:
+you can also run the tests for every supported version of coq with the following script:
 
 ```bash
 ./test.sh
