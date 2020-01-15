@@ -3,7 +3,7 @@ import neovim
 from .coqtop import new_coqtop
 from .coqapi import Ok, Err
 from .xmltype import *
-from .projectparser import ProjectParser
+from .projectparser import ProjectParser, CoqtopNotFoundException
 from .coqc import coqbuild
 from threading import Event, Lock, Thread
 from .parser import Parser
@@ -55,8 +55,11 @@ class Main(object):
         try:
             self.actionners[random_name] = Actionner(self.vim)
             self.currentVersion = self.actionners[random_name].version(args)
-        except:
-            self.vim.command('echo "Coq could not be found!"')
+        except Exception as e:
+            if isinstance(e, CoqtopNotFoundException):
+                self.vim.command('echo "{} binary is missing, coquille could not be launched."'.format(e.bin))
+            else:
+                self.vim.command('echo "Coq could not be found!"')
             return
 
         if not self.currentVersion.is_allowed():

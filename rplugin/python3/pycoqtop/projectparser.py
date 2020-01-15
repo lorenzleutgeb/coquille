@@ -1,6 +1,10 @@
 import os
 import subprocess
 
+class CoqtopNotFoundException(Exception):
+    def __init__(self, coqtop):
+        self.bin = coqtop
+
 class Version:
     def __init__(self, version):
         self.currentVersion = version
@@ -96,21 +100,24 @@ class ProjectParser():
 
     def version(self):
         options = [self.coqtop, '--print-version']
-        if os.name == 'nt':
-            coqtop = subprocess.Popen(options,
-                stdin = subprocess.PIPE, stdout = subprocess.PIPE,
-                stderr = subprocess.STDOUT)
-        else:
-            coqtop = subprocess.Popen(options,
-                stdin = subprocess.PIPE, stdout = subprocess.PIPE)
-        fd = coqtop.stdout.fileno()
-        data = os.read(fd, 0x4000).decode("utf-8")
-        version = data.split(' ')[0]
-        version = Version(version.split('.'))
-        if version.isatleast89():
-            self.coqtop = 'coqidetop'
-            if 'COQBIN' in self.variables:
-                self.coqtop = self.variables['COQBIN'] + '/coqidetop'
+        try:
+            if os.name == 'nt':
+                coqtop = subprocess.Popen(options,
+                    stdin = subprocess.PIPE, stdout = subprocess.PIPE,
+                    stderr = subprocess.STDOUT)
+            else:
+                coqtop = subprocess.Popen(options,
+                    stdin = subprocess.PIPE, stdout = subprocess.PIPE)
+            fd = coqtop.stdout.fileno()
+            data = os.read(fd, 0x4000).decode("utf-8")
+            version = data.split(' ')[0]
+            version = Version(version.split('.'))
+            if version.isatleast89():
+                self.coqtop = 'coqidetop'
+                if 'COQBIN' in self.variables:
+                    self.coqtop = self.variables['COQBIN'] + '/coqidetop'
+        except:
+            raise CoqtopNotFoundException(self.coqtop)
         return version
 
     def getArgs(self):
