@@ -36,7 +36,6 @@ class Main(object):
         self.info_wins = {}
         self.goal_wins = {}
         self.vim = vim
-        self.vim.command("let w:coquille_running='false'")
 
     def diditdieyet(self):
         "Checks whether the actionner thread died and re-raise its exception."
